@@ -4,6 +4,7 @@
   "version": "1.0.0",
   "description": "Trading Assistant and Management System",
   "author": "Soheil Keshtkar <soheil.keshtkar@gmail.com>",
+  "main": "electron-main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",

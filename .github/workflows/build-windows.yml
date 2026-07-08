@@ -26,10 +26,16 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install
+        run: npm ci || npm install
 
-      - name: Build and Package Windows App
-        run: npm run electron:build
+      - name: Build Web Assets (Vite)
+        run: npm run build
+
+      - name: Package Windows App (electron-builder)
+        run: npx electron-builder --win --x64 --publish never
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DEBUG: "electron-builder"
 
       - name: Upload Windows Installer Artifact
         uses: actions/upload-artifact@v4

@@ -9,10 +9,10 @@
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js dist-electron",
+    "clean": "node -e \"const fs = require('fs'); ['dist', 'dist-electron', 'server.js'].forEach(d => fs.existsSync(d) && fs.rmSync(d, {recursive: true, force: true}))\"",
     "lint": "tsc --noEmit",
     "electron:dev": "electron electron-main.cjs",
-    "electron:build": "npm run build && electron-builder --win --x64"
+    "electron:build": "npm run build && electron-builder --win --x64 --publish never"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -46,6 +46,7 @@
   "build": {
     "appId": "com.soheil.tradingassistant",
     "productName": "TradingAssistant",
+    "publish": null,
     "directories": {
       "output": "dist-electron"
     },

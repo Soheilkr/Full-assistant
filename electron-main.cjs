@@ -7,11 +7,11 @@ let hasActiveTrades = false;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 365,
+    width: 438,
     height: 740,
-    minWidth: 350,
+    minWidth: 420,
     minHeight: 400,
-    maxWidth: 600,
+    maxWidth: 720,
     maxHeight: 1200,
     resizable: true,
     alwaysOnTop: false,
@@ -75,17 +75,17 @@ ipcMain.on('set-window-collapsed', (event, collapsed) => {
   if (!mainWindow) return;
 
   if (collapsed) {
-    // Save current width or stick to default 365
+    // Save current width or stick to default 438
     mainWindow.setResizable(true);
-    mainWindow.setMinimumSize(350, 100);
-    mainWindow.setMaximumSize(600, 100);
-    mainWindow.setSize(365, 100);
+    mainWindow.setMinimumSize(420, 300);
+    mainWindow.setMaximumSize(720, 300);
+    mainWindow.setSize(438, 300);
     mainWindow.setResizable(false);
   } else {
     mainWindow.setResizable(true);
-    mainWindow.setMinimumSize(350, 400);
-    mainWindow.setMaximumSize(600, 1200);
-    mainWindow.setSize(365, 740);
+    mainWindow.setMinimumSize(420, 400);
+    mainWindow.setMaximumSize(720, 1200);
+    mainWindow.setSize(438, 740);
   }
 });
 

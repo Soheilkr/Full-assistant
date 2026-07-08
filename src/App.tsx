@@ -1479,9 +1479,22 @@ export default function App() {
     localStorage.setItem('trading_show_win_rate_when_disabled', showWinRateOnlyWhenDisabled ? 'true' : 'false');
   }, [showWinRateOnlyWhenDisabled]);
 
+  // Keep a ref of alarmSettings so we can access fresh values inside the interval without resetting it
+  const alarmSettingsRef = useRef(settings.alarmSettings);
+  useEffect(() => {
+    alarmSettingsRef.current = settings.alarmSettings;
+  }, [settings.alarmSettings]);
+
+  // Stable dependency key based on alarm configuration values that require an interval reset
+  const alarmTriggerDeps = useMemo(() => {
+    const alarmSet = settings.alarmSettings;
+    if (!alarmSet) return '';
+    return `${alarmSet.enabled}-${alarmSet.intervalEnabled}-${alarmSet.intervalMinutes}-${alarmSet.customTimesEnabled}-${(alarmSet.customTimes || []).join(',')}`;
+  }, [settings.alarmSettings]);
+
   // Alarm Triggering Effect
   useEffect(() => {
-    const alarmSet = settings.alarmSettings;
+    const alarmSet = alarmSettingsRef.current;
     if (!alarmSet || !alarmSet.enabled) return;
 
     const intervalId = setInterval(() => {
@@ -1496,15 +1509,18 @@ export default function App() {
       let shouldFire = false;
       let alarmType = '';
 
+      const currentAlarmSet = alarmSettingsRef.current;
+      if (!currentAlarmSet || !currentAlarmSet.enabled) return;
+
       // 1. Check custom specific times
-      if (alarmSet.customTimesEnabled && alarmSet.customTimes && alarmSet.customTimes.includes(currentTimeStr)) {
+      if (currentAlarmSet.customTimesEnabled && currentAlarmSet.customTimes && currentAlarmSet.customTimes.includes(currentTimeStr)) {
         shouldFire = true;
         alarmType = `ساعت مشخص شده ${currentTimeStr}`;
       }
 
       // 2. Check periodic intervals
-      if (!shouldFire && alarmSet.intervalEnabled) {
-        const intervalMins = alarmSet.intervalMinutes || 15;
+      if (!shouldFire && currentAlarmSet.intervalEnabled) {
+        const intervalMins = currentAlarmSet.intervalMinutes || 15;
         if (now.getMinutes() % intervalMins === 0) {
           shouldFire = true;
           alarmType = `بازه تکرار شونده ${intervalMins} دقیقه‌ای`;
@@ -1515,10 +1531,10 @@ export default function App() {
         setLastFiredTime(currentTimeStr);
         // Play the selected alarm audio sound
         playAlarmSound(
-          alarmSet.selectedSoundType, 
-          alarmSet.customSoundBase64,
-          alarmSet.playbackSeconds,
-          alarmSet.volume
+          currentAlarmSet.selectedSoundType, 
+          currentAlarmSet.customSoundBase64,
+          currentAlarmSet.playbackSeconds,
+          currentAlarmSet.volume
         );
 
         // Restore window and uncollapse if collapsed when alarm triggers
@@ -1547,7 +1563,7 @@ export default function App() {
     }, 1000); // Check every second for extreme timing precision
 
     return () => clearInterval(intervalId);
-  }, [settings.alarmSettings, lastFiredTime]);
+  }, [alarmTriggerDeps, lastFiredTime]);
 
   const checkPasscode = (code: string) => {
     const normalizedEntered = code
@@ -7049,54 +7065,65 @@ export default function App() {
   if (isCollapsed) {
     return (
       <div 
-        className="fixed inset-0 bg-slate-950 flex items-center justify-between px-4 py-1.5 select-none border border-red-500/40 rounded-2xl overflow-hidden font-sans cursor-pointer text-left z-50 hover:border-red-500/60 transition-colors"
+        className="fixed inset-0 bg-slate-950 flex flex-col justify-between p-6 select-none border border-red-500/40 rounded-2xl overflow-hidden font-sans cursor-pointer text-left z-50 hover:border-red-500/60 transition-colors"
         onClick={() => toggleCollapse(false)}
         title={settings.appLanguage === 'fa' ? 'بزرگ کردن برنامه (کلیک کنید)' : 'Click to Expand App'}
       >
-        {/* Brand Logo & Icon */}
-        <div className="flex items-center gap-3">
-          <div className="relative inline-flex justify-center items-center">
-            {/* Animated glowing red halo behind the crown */}
-            <div className="absolute -inset-1.5 bg-gradient-to-r from-red-600 via-rose-700 to-red-800 rounded-full blur opacity-55 animate-pulse"></div>
-            <div className="relative bg-slate-900 border border-red-900/40 p-1.5 rounded-xl flex items-center justify-center">
-              <Crown className="text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.7)]" size={16} />
+        {/* Top Row: Brand & Pulsing Dot */}
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-3">
+            <div className="relative inline-flex justify-center items-center">
+              <div className="absolute -inset-1.5 bg-gradient-to-r from-red-600 via-rose-700 to-red-800 rounded-full blur opacity-55 animate-pulse"></div>
+              <div className="relative bg-slate-900 border border-red-900/40 p-1.5 rounded-xl flex items-center justify-center">
+                <Crown className="text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.7)]" size={16} />
+              </div>
+            </div>
+            
+            <div className="flex flex-col text-left justify-center leading-none">
+              <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider bg-gradient-to-r from-red-200 via-red-400 to-amber-200 bg-clip-text text-transparent flex items-center gap-1">
+                SOHEIL KESHTKAR
+                <Sparkles className="text-red-500 animate-pulse" size={8} />
+              </span>
+              <span className="text-[7.5px] text-red-500/85 font-mono tracking-widest font-black uppercase mt-1">
+                PREMIUM TRADING
+              </span>
             </div>
           </div>
-          
-          <div className="flex flex-col text-left justify-center leading-none">
-            <span className="text-[10px] md:text-[11px] font-black uppercase tracking-wider bg-gradient-to-r from-red-200 via-red-400 to-amber-200 bg-clip-text text-transparent flex items-center gap-1">
-              SOHEIL KESHTKAR
-              <Sparkles className="text-red-500 animate-pulse" size={8} />
-            </span>
-            <span className="text-[7.5px] text-red-500/85 font-mono tracking-widest font-black uppercase mt-1">
-              PREMIUM TRADING
+
+          <div className="flex items-center gap-1.5 bg-red-950/35 px-2 py-1 rounded-full border border-red-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-ping" />
+            <span className="text-[8px] font-bold text-red-400 uppercase tracking-widest font-mono">
+              {settings.appLanguage === 'fa' ? 'پایش' : 'MONITOR'}
             </span>
           </div>
         </div>
 
-        {/* Right Status Indicator & Restore */}
-        <div className="flex items-center gap-3">
-          {/* Clock & Status */}
-          <div className="flex flex-col items-end text-right justify-center leading-none">
-            <span className="text-[11px] font-bold text-slate-100 font-mono tracking-wider">
+        {/* Center Row: Big Digital Clock & Strategy Desk */}
+        <div className="flex flex-col items-center justify-center my-auto gap-2">
+          <div className="bg-slate-900/45 border border-slate-800/60 rounded-2xl py-3.5 px-7 text-center w-full max-w-[280px] shadow-inner shadow-slate-950/40">
+            <span className="text-3xl font-black text-slate-100 font-mono tracking-widest block drop-shadow-[0_2px_10px_rgba(255,255,255,0.05)]">
               {format(new Date(), 'HH:mm')}
             </span>
-            <span className="text-[8px] font-semibold text-red-400 mt-1 uppercase tracking-wider animate-pulse">
-              {settings.appLanguage === 'fa' ? 'در حال پایش' : 'MONITORING'}
+            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mt-1">
+              {strategyMode === 'btb' ? 'BTB DESK ACTIVE' : 'CHANNEL DESK ACTIVE'}
             </span>
           </div>
-          
-          {/* Maximize Icon Button */}
+        </div>
+
+        {/* Bottom Row: Large Elegant Clickable Button */}
+        <div className="w-full">
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               toggleCollapse(false);
             }}
-            className="w-10 h-10 rounded-lg bg-red-500/20 hover:bg-red-500 border border-red-500/30 text-white flex items-center justify-center transition-all cursor-pointer hover:scale-110 active:scale-95 shadow-md shadow-red-500/20"
-            title={settings.appLanguage === 'en' ? 'Expand App' : 'بزرگ کردن برنامه'}
+            className="w-full py-3.5 px-4 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-red-400 hover:text-red-300 font-black tracking-wide text-xs flex items-center justify-center gap-2.5 transition-all cursor-pointer shadow-md shadow-red-950/40 hover:border-red-500/50"
           >
-            <Maximize2 size={16} className="text-white" />
+            <Maximize2 size={13} className="text-red-400 animate-pulse" />
+            <span>
+              {settings.appLanguage === 'fa' ? 'بزرگ کردن و بازگشت به میز معاملاتی' : 'Expand & Return to Trading Desk'}
+            </span>
           </button>
         </div>
       </div>

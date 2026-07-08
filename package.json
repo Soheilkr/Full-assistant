@@ -10,7 +10,7 @@
     "clean": "rm -rf dist server.js dist-electron",
     "lint": "tsc --noEmit",
     "electron:dev": "electron electron-main.cjs",
-    "electron:build": "npm run build && electron-builder"
+    "electron:build": "npm run build && electron-builder --win --x64"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

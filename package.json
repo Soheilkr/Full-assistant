@@ -46,7 +46,6 @@
   "build": {
     "appId": "com.soheil.tradingassistant",
     "productName": "TradingAssistant",
-    "publish": null,
     "directories": {
       "output": "dist-electron"
     },

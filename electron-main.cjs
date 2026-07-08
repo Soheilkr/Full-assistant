@@ -77,9 +77,9 @@ ipcMain.on('set-window-collapsed', (event, collapsed) => {
   if (collapsed) {
     // Save current width or stick to default 365
     mainWindow.setResizable(true);
-    mainWindow.setMinimumSize(350, 60);
-    mainWindow.setMaximumSize(600, 60);
-    mainWindow.setSize(365, 60);
+    mainWindow.setMinimumSize(350, 100);
+    mainWindow.setMaximumSize(600, 100);
+    mainWindow.setSize(365, 100);
     mainWindow.setResizable(false);
   } else {
     mainWindow.setResizable(true);

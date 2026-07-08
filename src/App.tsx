@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Settings as SettingsIcon, TrendingUp, TrendingDown, AlertCircle, CheckCircle2, XCircle, History, PlusCircle, ChevronLeft, ChevronRight, Brain, BarChart3, RotateCcw, Trash, Trash2, ChevronDown, ChevronUp, Square, CheckSquare, Download, Upload, Crown, Sparkles, Plus, Edit, RefreshCw, CloudLightning, Database, Lock, Unlock, LogOut, Volume2, Bell, Music, X, Clock, Camera, Pin, Minimize2, Maximize2, FolderOpen, FileSpreadsheet } from 'lucide-react';
 import { format } from 'date-fns';
@@ -1593,6 +1593,12 @@ export default function App() {
   };
 
   useEffect(() => {
+    // If running in Electron, the main process's window 'close' listener handles confirmation.
+    // We must NOT intercept beforeunload here, otherwise it conflicts and prevents closing.
+    if (typeof window !== 'undefined' && 'electronAPI' in window) {
+      return;
+    }
+
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       const currentOpen = (dailyState?.trades || []).filter(t => t && t.result === 'PENDING');
       const currentModeName = strategyMode === 'btb' ? 'BTB' : 'Channel';
@@ -2462,8 +2468,8 @@ export default function App() {
   };
   const isConsecutiveLosses = checkConsecutiveLosses();
 
-  // 1. Gather all completed trades from the past dailyRecords and today's trades
-  const getCompletedAppTrades = (): boolean[] => {
+  // 1. Memoize completed app trades list
+  const completedAppTrades = useMemo((): boolean[] => {
     const list: boolean[] = [];
     if (history && Array.isArray(history.dailyRecords)) {
       const cronRecords = [...history.dailyRecords].reverse();
@@ -2483,11 +2489,13 @@ export default function App() {
       }
     }
     return list;
-  };
+  }, [history?.dailyRecords, dailyState?.trades]);
 
-  // 2. Combine with seed history in settings
-  const getCombinedTradeHistory = (): { isWin: boolean; isSeed: boolean }[] => {
-    const appTrades = getCompletedAppTrades().map(isWin => ({ isWin, isSeed: false }));
+  const getCompletedAppTrades = (): boolean[] => completedAppTrades;
+
+  // 2. Memoize combined trade history with seed history
+  const combinedTradeHistory = useMemo((): { isWin: boolean; isSeed: boolean }[] => {
+    const appTrades = completedAppTrades.map(isWin => ({ isWin, isSeed: false }));
     const seedString = String(settings.positionSizing?.seedHistoryString !== undefined 
       ? settings.positionSizing.seedHistoryString 
       : defaultPositionSizing.seedHistoryString);
@@ -2530,11 +2538,17 @@ export default function App() {
     const combined = [...seedTrades, ...appTrades];
     const lookback = settings.positionSizing?.lookback ?? defaultPositionSizing.lookback;
     return combined.slice(-lookback);
-  };
+  }, [
+    completedAppTrades,
+    settings.positionSizing?.seedHistoryString,
+    settings.positionSizing?.lookback
+  ]);
 
-  // 3. Get Risk State
-  const getRiskState = () => {
-    const combinedHistory = getCombinedTradeHistory();
+  const getCombinedTradeHistory = (): { isWin: boolean; isSeed: boolean }[] => combinedTradeHistory;
+
+  // 3. Memoize risk state calculation
+  const riskStateMemo = useMemo(() => {
+    const combinedHistory = combinedTradeHistory;
     const isEnabled = settings.positionSizing?.enabled !== false;
     const riskMgr = new RiskManager({
       lookback: settings.positionSizing?.lookback ?? defaultPositionSizing.lookback,
@@ -2565,7 +2579,18 @@ export default function App() {
       historyItems: combinedHistory,
       enabled: true
     };
-  };
+  }, [
+    combinedTradeHistory,
+    settings.positionSizing?.enabled,
+    settings.positionSizing?.lookback,
+    settings.positionSizing?.lowThreshold,
+    settings.positionSizing?.highThreshold,
+    settings.positionSizing?.lowRisk,
+    settings.positionSizing?.normalRisk,
+    settings.positionSizing?.highRisk,
+  ]);
+
+  const getRiskState = () => riskStateMemo;
 
   const getSequenceProbabilityInfo = () => {
     const seq = completedTrades.map(t => t.result === 'TP' ? 'W' : 'L').join('');

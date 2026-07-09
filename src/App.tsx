@@ -13,6 +13,58 @@ import { Trade, DailyState, TradeResult, PSYCHOLOGY_TIPS, PSYCHOLOGY_TIPS_EN, Hi
 import { RiskManager } from './lib/riskManager';
 import { t } from './translations';
 
+// Electron storage persistence decorator
+if (typeof window !== 'undefined' && 'electronAPI' in window) {
+  const originalGetItem = Storage.prototype.getItem;
+  const originalSetItem = Storage.prototype.setItem;
+  const originalRemoveItem = Storage.prototype.removeItem;
+
+  Storage.prototype.getItem = function (key) {
+    const api = (window as any).electronAPI;
+    if (api && typeof api.loadStateSync === 'function') {
+      try {
+        const res = api.loadStateSync(key);
+        if (res && res.success && res.data !== null) {
+          return typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+        }
+      } catch (err) {
+        console.error('Error in loaded state override:', err);
+      }
+    }
+    return originalGetItem.call(this, key);
+  };
+
+  Storage.prototype.setItem = function (key, value) {
+    const api = (window as any).electronAPI;
+    if (api && typeof api.saveStateSync === 'function') {
+      try {
+        let parsed;
+        try {
+          parsed = JSON.parse(value);
+        } catch (e) {
+          parsed = value;
+        }
+        api.saveStateSync(key, parsed);
+      } catch (err) {
+        console.error('Error in saved state override:', err);
+      }
+    }
+    originalSetItem.call(this, key, value);
+  };
+
+  Storage.prototype.removeItem = function (key) {
+    const api = (window as any).electronAPI;
+    if (api && typeof api.saveStateSync === 'function') {
+      try {
+        api.saveStateSync(key, null);
+      } catch (err) {
+        console.error('Error in remove state override:', err);
+      }
+    }
+    originalRemoveItem.call(this, key);
+  };
+}
+
 // Page IDs for reference as requested
 const PAGES = {
   WELCOME: "A",
@@ -5080,11 +5132,11 @@ export default function App() {
                       </label>
                       <input
                         type="number"
-                        min="350"
-                        max="1200"
+                        min="40"
+                        max="2000"
                         value={settings.windowDimensions?.unfoldedWidth ?? 365}
                         onChange={(e) => {
-                          const val = Math.max(350, Math.min(1200, parseInt(e.target.value) || 365));
+                          const val = Math.max(40, Math.min(2000, parseInt(e.target.value) || 365));
                           setSettings(prev => ({
                             ...prev,
                             windowDimensions: {
@@ -5103,11 +5155,11 @@ export default function App() {
                       </label>
                       <input
                         type="number"
-                        min="400"
-                        max="1200"
+                        min="40"
+                        max="2000"
                         value={settings.windowDimensions?.unfoldedHeight ?? 740}
                         onChange={(e) => {
-                          const val = Math.max(400, Math.min(1200, parseInt(e.target.value) || 740));
+                          const val = Math.max(40, Math.min(2000, parseInt(e.target.value) || 740));
                           setSettings(prev => ({
                             ...prev,
                             windowDimensions: {
@@ -5135,11 +5187,11 @@ export default function App() {
                       </label>
                       <input
                         type="number"
-                        min="350"
-                        max="1200"
+                        min="40"
+                        max="2000"
                         value={settings.windowDimensions?.foldedWidth ?? 365}
                         onChange={(e) => {
-                          const val = Math.max(350, Math.min(1200, parseInt(e.target.value) || 365));
+                          const val = Math.max(40, Math.min(2000, parseInt(e.target.value) || 365));
                           setSettings(prev => ({
                             ...prev,
                             windowDimensions: {
@@ -5158,11 +5210,11 @@ export default function App() {
                       </label>
                       <input
                         type="number"
-                        min="50"
-                        max="300"
+                        min="40"
+                        max="2000"
                         value={settings.windowDimensions?.foldedHeight ?? 100}
                         onChange={(e) => {
-                          const val = Math.max(50, Math.min(300, parseInt(e.target.value) || 100));
+                          const val = Math.max(40, Math.min(2000, parseInt(e.target.value) || 100));
                           setSettings(prev => ({
                             ...prev,
                             windowDimensions: {

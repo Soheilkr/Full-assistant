@@ -9,10 +9,10 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 365,
     height: 740,
-    minWidth: 350,
-    minHeight: 400,
-    maxWidth: 600,
-    maxHeight: 1200,
+    minWidth: 40,
+    minHeight: 40,
+    maxWidth: 1600,
+    maxHeight: 1600,
     resizable: true,
     alwaysOnTop: false,
     frame: true, // Use system frame for minimize/maximize/close buttons and title bar
@@ -81,14 +81,14 @@ ipcMain.on('set-window-collapsed', (event, collapsed, customDimensions) => {
 
   if (collapsed) {
     mainWindow.setResizable(true);
-    mainWindow.setMinimumSize(Math.min(350, foldedWidth), Math.min(100, foldedHeight));
-    mainWindow.setMaximumSize(Math.max(600, foldedWidth), foldedHeight);
+    mainWindow.setMinimumSize(Math.min(40, foldedWidth), Math.min(40, foldedHeight));
+    mainWindow.setMaximumSize(Math.max(1600, foldedWidth), Math.max(1600, foldedHeight));
     mainWindow.setSize(foldedWidth, foldedHeight);
     mainWindow.setResizable(false);
   } else {
     mainWindow.setResizable(true);
-    mainWindow.setMinimumSize(Math.min(350, unfoldedWidth), Math.min(400, unfoldedHeight));
-    mainWindow.setMaximumSize(Math.max(600, unfoldedWidth), Math.max(1200, unfoldedHeight));
+    mainWindow.setMinimumSize(Math.min(40, unfoldedWidth), Math.min(40, unfoldedHeight));
+    mainWindow.setMaximumSize(Math.max(1600, unfoldedWidth), Math.max(1600, unfoldedHeight));
     mainWindow.setSize(unfoldedWidth, unfoldedHeight);
   }
 });
@@ -191,5 +191,45 @@ ipcMain.handle('take-screenshot', async (event, { monitorIndex, folderPath, file
   } catch (error) {
     console.error('Screenshot error:', error);
     return { success: false, error: error.message };
+  }
+});
+
+// IPC Handler: Synchronous save state to file
+ipcMain.on('save-state-sync', (event, { key, data }) => {
+  try {
+    const userDataPath = app.getPath('userData');
+    const storageDir = path.join(userDataPath, 'btb_storage');
+    if (!fs.existsSync(storageDir)) {
+      fs.mkdirSync(storageDir, { recursive: true });
+    }
+    const filePath = path.join(storageDir, `${key}.json`);
+    if (data === null) {
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+      }
+    } else {
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+    }
+    event.returnValue = { success: true };
+  } catch (error) {
+    console.error(`Error saving state sync for ${key}:`, error);
+    event.returnValue = { success: false, error: error.message };
+  }
+});
+
+// IPC Handler: Synchronous load state from file
+ipcMain.on('load-state-sync', (event, { key }) => {
+  try {
+    const userDataPath = app.getPath('userData');
+    const filePath = path.join(userDataPath, 'btb_storage', `${key}.json`);
+    if (fs.existsSync(filePath)) {
+      const content = fs.readFileSync(filePath, 'utf8');
+      event.returnValue = { success: true, data: JSON.parse(content) };
+      return;
+    }
+    event.returnValue = { success: false, data: null };
+  } catch (error) {
+    console.error(`Error loading state sync for ${key}:`, error);
+    event.returnValue = { success: false, error: error.message };
   }
 });

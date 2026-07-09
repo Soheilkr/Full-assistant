@@ -7,5 +7,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   restoreWindow: () => ipcRenderer.send('restore-window'),
   saveExcelFile: (args) => ipcRenderer.invoke('save-excel-file', args),
   takeScreenshot: (args) => ipcRenderer.invoke('take-screenshot', args),
-  selectDirectory: () => ipcRenderer.invoke('select-directory')
+  selectDirectory: () => ipcRenderer.invoke('select-directory'),
+  saveStateSync: (key, data) => ipcRenderer.sendSync('save-state-sync', { key, data }),
+  loadStateSync: (key) => ipcRenderer.sendSync('load-state-sync', { key })
 });

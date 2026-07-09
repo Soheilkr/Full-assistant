@@ -7,8 +7,8 @@ let hasActiveTrades = false;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 365,
-    height: 740,
+    width: 400,
+    height: 750,
     minWidth: 40,
     minHeight: 40,
     maxWidth: 1600,
@@ -74,10 +74,10 @@ app.on('window-all-closed', () => {
 ipcMain.on('set-window-collapsed', (event, collapsed, customDimensions) => {
   if (!mainWindow) return;
 
-  const unfoldedWidth = Math.round((customDimensions && customDimensions.unfoldedWidth) || 365);
-  const unfoldedHeight = Math.round((customDimensions && customDimensions.unfoldedHeight) || 740);
-  const foldedWidth = Math.round((customDimensions && customDimensions.foldedWidth) || 365);
-  const foldedHeight = Math.round((customDimensions && customDimensions.foldedHeight) || 100);
+  const unfoldedWidth = Math.round((customDimensions && customDimensions.unfoldedWidth) || 400);
+  const unfoldedHeight = Math.round((customDimensions && customDimensions.unfoldedHeight) || 750);
+  const foldedWidth = Math.round((customDimensions && customDimensions.foldedWidth) || 200);
+  const foldedHeight = Math.round((customDimensions && customDimensions.foldedHeight) || 120);
 
   if (collapsed) {
     mainWindow.setResizable(true);
@@ -224,7 +224,12 @@ ipcMain.on('load-state-sync', (event, { key }) => {
     const filePath = path.join(userDataPath, 'btb_storage', `${key}.json`);
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, 'utf8');
-      event.returnValue = { success: true, data: JSON.parse(content) };
+      try {
+        event.returnValue = { success: true, data: JSON.parse(content) };
+      } catch (parseErr) {
+        // Fallback: If not valid JSON, treat as raw string value safely
+        event.returnValue = { success: true, data: content };
+      }
       return;
     }
     event.returnValue = { success: false, data: null };

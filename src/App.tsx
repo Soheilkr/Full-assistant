@@ -22,6 +22,9 @@ if (typeof window !== 'undefined' && 'electronAPI' in window) {
 
   // Cache object to store loaded and saved values
   const storageCache: Record<string, string | null> = {};
+  
+  // Set to track keys that are successfully loaded from or written to the Electron file system
+  const synchronizedKeys = new Set<string>();
 
   Storage.prototype.getItem = function (key) {
     // If we already have it in cache, return it instantly (0 CPU/Disk overhead)
@@ -37,6 +40,7 @@ if (typeof window !== 'undefined' && 'electronAPI' in window) {
         if (res && res.success && res.data !== null) {
           const stringified = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
           storageCache[key] = stringified;
+          synchronizedKeys.add(key);
           // Sync to standard localStorage too so they stay aligned
           originalSetItem.call(this, key, stringified);
           return stringified;
@@ -49,12 +53,13 @@ if (typeof window !== 'undefined' && 'electronAPI' in window) {
     // Fallback to original localStorage
     const val = originalGetItem.call(this, key);
     storageCache[key] = val;
+    // Standard localStorage is not guaranteed to be synchronized with files
     return val;
   };
 
   Storage.prototype.setItem = function (key, value) {
-    // Check if value is identical to cached value. If so, skip disk I/O completely!
-    if (storageCache[key] === value) {
+    // Skip file-write ONLY if key is already synchronized AND value is identical to cached value.
+    if (synchronizedKeys.has(key) && storageCache[key] === value) {
       return;
     }
 
@@ -72,7 +77,10 @@ if (typeof window !== 'undefined' && 'electronAPI' in window) {
         } catch (e) {
           parsed = value;
         }
-        api.saveStateSync(key, parsed);
+        const res = api.saveStateSync(key, parsed);
+        if (res && res.success) {
+          synchronizedKeys.add(key);
+        }
       } catch (err) {
         console.error('Error in saved state override:', err);
       }
@@ -80,10 +88,8 @@ if (typeof window !== 'undefined' && 'electronAPI' in window) {
   };
 
   Storage.prototype.removeItem = function (key) {
-    if (storageCache[key] === null) {
-      return;
-    }
     storageCache[key] = null;
+    synchronizedKeys.delete(key);
     originalRemoveItem.call(this, key);
 
     const api = (window as any).electronAPI;
@@ -97,10 +103,11 @@ if (typeof window !== 'undefined' && 'electronAPI' in window) {
   };
 
   Storage.prototype.clear = function () {
-    // Clear cache
+    // Clear cache and set
     for (const key in storageCache) {
       delete storageCache[key];
     }
+    synchronizedKeys.clear();
     originalClear.call(this);
     const api = (window as any).electronAPI;
     if (api && typeof api.clearAllStatesSync === 'function') {
@@ -904,10 +911,10 @@ export default function App() {
         playbackSeconds: 30,
       },
       windowDimensions: {
-        unfoldedWidth: 365,
-        unfoldedHeight: 740,
-        foldedWidth: 365,
-        foldedHeight: 100,
+        unfoldedWidth: 400,
+        unfoldedHeight: 750,
+        foldedWidth: 200,
+        foldedHeight: 120,
       }
     };
   });
@@ -1434,10 +1441,10 @@ export default function App() {
         playbackSeconds: 30,
       },
       windowDimensions: settings.windowDimensions || {
-        unfoldedWidth: 365,
-        unfoldedHeight: 740,
-        foldedWidth: 365,
-        foldedHeight: 100,
+        unfoldedWidth: 400,
+        unfoldedHeight: 750,
+        foldedWidth: 200,
+        foldedHeight: 120,
       }
     };
     try {
@@ -1533,15 +1540,15 @@ export default function App() {
             playbackSeconds: 30,
           },
           windowDimensions: merged.windowDimensions ? {
-            unfoldedWidth: merged.windowDimensions.unfoldedWidth ?? 365,
-            unfoldedHeight: merged.windowDimensions.unfoldedHeight ?? 740,
-            foldedWidth: merged.windowDimensions.foldedWidth ?? 365,
-            foldedHeight: merged.windowDimensions.foldedHeight ?? 100,
+            unfoldedWidth: merged.windowDimensions.unfoldedWidth ?? 400,
+            unfoldedHeight: merged.windowDimensions.unfoldedHeight ?? 750,
+            foldedWidth: merged.windowDimensions.foldedWidth ?? 200,
+            foldedHeight: merged.windowDimensions.foldedHeight ?? 120,
           } : {
-            unfoldedWidth: 365,
-            unfoldedHeight: 740,
-            foldedWidth: 365,
-            foldedHeight: 100,
+            unfoldedWidth: 400,
+            unfoldedHeight: 750,
+            foldedWidth: 200,
+            foldedHeight: 120,
           }
         };
       } else {
@@ -5183,13 +5190,13 @@ export default function App() {
                         type="number"
                         min="40"
                         max="2000"
-                        value={settings.windowDimensions?.unfoldedWidth ?? 365}
+                        value={settings.windowDimensions?.unfoldedWidth ?? 400}
                         onChange={(e) => {
-                          const val = Math.max(40, Math.min(2000, parseInt(e.target.value) || 365));
+                          const val = Math.max(40, Math.min(2000, parseInt(e.target.value) || 400));
                           setSettings(prev => ({
                             ...prev,
                             windowDimensions: {
-                              ...(prev.windowDimensions || { unfoldedWidth: 365, unfoldedHeight: 740, foldedWidth: 365, foldedHeight: 100 }),
+                              ...(prev.windowDimensions || { unfoldedWidth: 400, unfoldedHeight: 750, foldedWidth: 200, foldedHeight: 120 }),
                               unfoldedWidth: val
                             }
                           }));
@@ -5206,13 +5213,13 @@ export default function App() {
                         type="number"
                         min="40"
                         max="2000"
-                        value={settings.windowDimensions?.unfoldedHeight ?? 740}
+                        value={settings.windowDimensions?.unfoldedHeight ?? 750}
                         onChange={(e) => {
-                          const val = Math.max(40, Math.min(2000, parseInt(e.target.value) || 740));
+                          const val = Math.max(40, Math.min(2000, parseInt(e.target.value) || 750));
                           setSettings(prev => ({
                             ...prev,
                             windowDimensions: {
-                              ...(prev.windowDimensions || { unfoldedWidth: 365, unfoldedHeight: 740, foldedWidth: 365, foldedHeight: 100 }),
+                              ...(prev.windowDimensions || { unfoldedWidth: 400, unfoldedHeight: 750, foldedWidth: 200, foldedHeight: 120 }),
                               unfoldedHeight: val
                             }
                           }));
@@ -5238,13 +5245,13 @@ export default function App() {
                         type="number"
                         min="40"
                         max="2000"
-                        value={settings.windowDimensions?.foldedWidth ?? 365}
+                        value={settings.windowDimensions?.foldedWidth ?? 200}
                         onChange={(e) => {
-                          const val = Math.max(40, Math.min(2000, parseInt(e.target.value) || 365));
+                          const val = Math.max(40, Math.min(2000, parseInt(e.target.value) || 200));
                           setSettings(prev => ({
                             ...prev,
                             windowDimensions: {
-                              ...(prev.windowDimensions || { unfoldedWidth: 365, unfoldedHeight: 740, foldedWidth: 365, foldedHeight: 100 }),
+                              ...(prev.windowDimensions || { unfoldedWidth: 400, unfoldedHeight: 750, foldedWidth: 200, foldedHeight: 120 }),
                               foldedWidth: val
                             }
                           }));
@@ -5261,13 +5268,13 @@ export default function App() {
                         type="number"
                         min="40"
                         max="2000"
-                        value={settings.windowDimensions?.foldedHeight ?? 100}
+                        value={settings.windowDimensions?.foldedHeight ?? 120}
                         onChange={(e) => {
-                          const val = Math.max(40, Math.min(2000, parseInt(e.target.value) || 100));
+                          const val = Math.max(40, Math.min(2000, parseInt(e.target.value) || 120));
                           setSettings(prev => ({
                             ...prev,
                             windowDimensions: {
-                              ...(prev.windowDimensions || { unfoldedWidth: 365, unfoldedHeight: 740, foldedWidth: 365, foldedHeight: 100 }),
+                              ...(prev.windowDimensions || { unfoldedWidth: 400, unfoldedHeight: 750, foldedWidth: 200, foldedHeight: 120 }),
                               foldedHeight: val
                             }
                           }));
@@ -5287,17 +5294,17 @@ export default function App() {
                     setSettings(prev => ({
                       ...prev,
                       windowDimensions: {
-                        unfoldedWidth: 365,
-                        unfoldedHeight: 740,
-                        foldedWidth: 365,
-                        foldedHeight: 100,
+                        unfoldedWidth: 400,
+                        unfoldedHeight: 750,
+                        foldedWidth: 200,
+                        foldedHeight: 120,
                       }
                     }));
                   }}
                   className="flex items-center gap-1.5 text-[11px] font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 px-3.5 py-2 rounded-xl border border-red-500/20 cursor-pointer transition-all"
                 >
                   <RotateCcw size={12} />
-                  <span>{settings.appLanguage === 'fa' ? 'بازنشانی به پیش‌فرض (Reset Defaults)' : 'Reset to Default (365x740 / 365x100)'}</span>
+                  <span>{settings.appLanguage === 'fa' ? 'بازنشانی به پیش‌فرض (Reset Defaults)' : 'Reset to Default (400x750 / 200x120)'}</span>
                 </button>
               </div>
             </div>
@@ -5499,7 +5506,7 @@ export default function App() {
                       api.clearAllStatesSync();
                     }
                     if (api && typeof api.setWindowCollapsed === 'function') {
-                      api.setWindowCollapsed(false, { unfoldedWidth: 365, unfoldedHeight: 740, foldedWidth: 365, foldedHeight: 100 });
+                      api.setWindowCollapsed(false, { unfoldedWidth: 400, unfoldedHeight: 750, foldedWidth: 200, foldedHeight: 120 });
                     }
                   }
                   window.location.reload();

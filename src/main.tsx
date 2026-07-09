@@ -1,10 +1,24 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
+import {StrictMode} from 'react';
+import {createRoot} from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import { registerSW } from 'virtual:pwa-register';
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
+// Register Service Worker safely only when opened directly in browser (enables native PWA Install prompt)
+if (typeof window !== 'undefined') {
+  let isInsideIframe = false;
+  try {
+    isInsideIframe = window.self !== window.top;
+  } catch (e) {
+    isInsideIframe = true;
+  }
+  if (!isInsideIframe) {
+    registerSW({ immediate: true });
+  }
+}
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
     <App />
-  </React.StrictMode>,
+  </StrictMode>,
 );

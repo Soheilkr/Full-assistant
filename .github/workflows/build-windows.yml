@@ -26,7 +26,10 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm install
+        run: |
+          if (Test-Path package-lock.json) { Remove-Item package-lock.json -Force }
+          npm install --legacy-peer-deps
+        shell: powershell
 
       - name: Build Web Assets (Vite)
         run: npm run build

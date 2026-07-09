@@ -13,28 +13,56 @@ import { Trade, DailyState, TradeResult, PSYCHOLOGY_TIPS, PSYCHOLOGY_TIPS_EN, Hi
 import { RiskManager } from './lib/riskManager';
 import { t } from './translations';
 
-// Electron storage persistence decorator
+// Electron storage persistence decorator with Memory Cache to avoid high CPU usage & disk bottleneck
 if (typeof window !== 'undefined' && 'electronAPI' in window) {
   const originalGetItem = Storage.prototype.getItem;
   const originalSetItem = Storage.prototype.setItem;
   const originalRemoveItem = Storage.prototype.removeItem;
+  const originalClear = Storage.prototype.clear;
+
+  // Cache object to store loaded and saved values
+  const storageCache: Record<string, string | null> = {};
 
   Storage.prototype.getItem = function (key) {
+    // If we already have it in cache, return it instantly (0 CPU/Disk overhead)
+    if (key in storageCache) {
+      return storageCache[key];
+    }
+
+    // Try loading from Electron file storage once
     const api = (window as any).electronAPI;
     if (api && typeof api.loadStateSync === 'function') {
       try {
         const res = api.loadStateSync(key);
         if (res && res.success && res.data !== null) {
-          return typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+          const stringified = typeof res.data === 'string' ? res.data : JSON.stringify(res.data);
+          storageCache[key] = stringified;
+          // Sync to standard localStorage too so they stay aligned
+          originalSetItem.call(this, key, stringified);
+          return stringified;
         }
       } catch (err) {
         console.error('Error in loaded state override:', err);
       }
     }
-    return originalGetItem.call(this, key);
+
+    // Fallback to original localStorage
+    const val = originalGetItem.call(this, key);
+    storageCache[key] = val;
+    return val;
   };
 
   Storage.prototype.setItem = function (key, value) {
+    // Check if value is identical to cached value. If so, skip disk I/O completely!
+    if (storageCache[key] === value) {
+      return;
+    }
+
+    // Update memory cache and standard localStorage
+    storageCache[key] = value;
+    originalSetItem.call(this, key, value);
+
+    // Save to Electron file storage
     const api = (window as any).electronAPI;
     if (api && typeof api.saveStateSync === 'function') {
       try {
@@ -49,10 +77,15 @@ if (typeof window !== 'undefined' && 'electronAPI' in window) {
         console.error('Error in saved state override:', err);
       }
     }
-    originalSetItem.call(this, key, value);
   };
 
   Storage.prototype.removeItem = function (key) {
+    if (storageCache[key] === null) {
+      return;
+    }
+    storageCache[key] = null;
+    originalRemoveItem.call(this, key);
+
     const api = (window as any).electronAPI;
     if (api && typeof api.saveStateSync === 'function') {
       try {
@@ -61,7 +94,22 @@ if (typeof window !== 'undefined' && 'electronAPI' in window) {
         console.error('Error in remove state override:', err);
       }
     }
-    originalRemoveItem.call(this, key);
+  };
+
+  Storage.prototype.clear = function () {
+    // Clear cache
+    for (const key in storageCache) {
+      delete storageCache[key];
+    }
+    originalClear.call(this);
+    const api = (window as any).electronAPI;
+    if (api && typeof api.clearAllStatesSync === 'function') {
+      try {
+        api.clearAllStatesSync();
+      } catch (err) {
+        console.error('Error clearing Electron storage:', err);
+      }
+    }
   };
 }
 

@@ -1827,7 +1827,8 @@ export default function App() {
         'trading_show_win_rate_when_disabled',
         'trading_settings',
         'trading_daily_state',
-        'trading_voice_groups'
+        'trading_voice_groups',
+        'trading_global_settings'
       ];
       const payload: Record<string, string | null> = {};
       keys.forEach(key => {
@@ -5425,21 +5426,40 @@ export default function App() {
           <div className="space-y-4 border-t border-slate-800 pt-6 font-sans text-left">
             <div className="flex items-center gap-2 text-rose-500 text-left">
               <Trash2 size={18} />
-              <h3 className="text-sm font-bold text-slate-200 text-left">Danger Zone & Factory Reset</h3>
+              <h3 className="text-sm font-bold text-slate-200 text-left">
+                {settings.appLanguage === 'fa' ? 'منطقه خطر و ریست فکتوری' : 'Danger Zone & Factory Reset'}
+              </h3>
             </div>
             <p className="text-[11px] text-slate-500 leading-relaxed text-left font-sans">
-              Deleting all trading records, resetting system rules to defaults, and clearing all browser cache. This action is irreversible.
+              {settings.appLanguage === 'fa' 
+                ? 'پاک کردن تمامی سوابق معاملاتی، بازنشانی قوانین سیستم به پیش‌فرض‌ها و پاکسازی حافظه کش برنامه. این عمل غیرقابل برگشت است.'
+                : 'Deleting all trading records, resetting system rules to defaults, and clearing all browser cache. This action is irreversible.'
+              }
             </p>
             <button
               onClick={() => {
-                if (confirm('Are you absolutely sure you want to reset everything? This will delete all history and rules.')) {
+                const confirmed = confirm(
+                  settings.appLanguage === 'fa' 
+                    ? 'آیا از ریست فکتوری و پاک کردن تمامی اطلاعات و تنظیمات مطمئن هستید؟ این عمل غیرقابل بازگشت است.'
+                    : 'Are you absolutely sure you want to reset everything? This will delete all history, configurations, and rules.'
+                );
+                if (confirmed) {
                   localStorage.clear();
+                  if (typeof window !== 'undefined' && 'electronAPI' in window) {
+                    const api = (window as any).electronAPI;
+                    if (api && typeof api.clearAllStatesSync === 'function') {
+                      api.clearAllStatesSync();
+                    }
+                    if (api && typeof api.setWindowCollapsed === 'function') {
+                      api.setWindowCollapsed(false, { unfoldedWidth: 365, unfoldedHeight: 740, foldedWidth: 365, foldedHeight: 100 });
+                    }
+                  }
                   window.location.reload();
                 }
               }}
-              className="w-full py-3 bg-rose-950/20 hover:bg-rose-900/30 border border-rose-500/30 text-rose-400 rounded-2xl text-xs font-bold transition-all active:scale-[0.98] cursor-pointer"
+              className="w-full py-3 bg-rose-950/20 hover:bg-rose-900/30 border border-rose-500/30 text-rose-400 rounded-2xl text-xs font-bold transition-all active:scale-[0.98] cursor-pointer text-center"
             >
-              Reset Entire Application Data
+              {settings.appLanguage === 'fa' ? 'ریست فکتوری و پاکسازی کامل کل اطلاعات برنامه' : 'Reset Entire Application Data'}
             </button>
           </div>
 

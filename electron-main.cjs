@@ -233,3 +233,21 @@ ipcMain.on('load-state-sync', (event, { key }) => {
     event.returnValue = { success: false, error: error.message };
   }
 });
+
+// IPC Handler: Synchronous clear all states
+ipcMain.on('clear-all-states-sync', (event) => {
+  try {
+    const userDataPath = app.getPath('userData');
+    const storageDir = path.join(userDataPath, 'btb_storage');
+    if (fs.existsSync(storageDir)) {
+      const files = fs.readdirSync(storageDir);
+      for (const file of files) {
+        fs.unlinkSync(path.join(storageDir, file));
+      }
+    }
+    event.returnValue = { success: true };
+  } catch (error) {
+    console.error('Error clearing all states sync:', error);
+    event.returnValue = { success: false, error: error.message };
+  }
+});

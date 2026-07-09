@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   takeScreenshot: (args) => ipcRenderer.invoke('take-screenshot', args),
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   saveStateSync: (key, data) => ipcRenderer.sendSync('save-state-sync', { key, data }),
-  loadStateSync: (key) => ipcRenderer.sendSync('load-state-sync', { key })
+  loadStateSync: (key) => ipcRenderer.sendSync('load-state-sync', { key }),
+  clearAllStatesSync: () => ipcRenderer.sendSync('clear-all-states-sync')
 });

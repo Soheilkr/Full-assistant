@@ -1,8 +1,0 @@
-{
-  "name": "Soheil Keshtkar",
-  "description": "Premium forex trading journal and assistant custom tailored for Soheil Keshtkar.",
-  "requestFramePermissions": [],
-  "majorCapabilities": [
-    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
-  ]
-}

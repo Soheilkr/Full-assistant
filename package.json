@@ -2,13 +2,17 @@
   "name": "trading-assistant",
   "private": true,
   "version": "1.0.0",
+  "description": "Trading Assistant and Management System",
+  "author": "Soheil Keshtkar <soheil.keshtkar@gmail.com>",
+  "main": "electron-main.cjs",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 3000",
     "build": "tsc && vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "tsc --noEmit",
     "preview": "vite preview --port 3000",
-    "electron-dev": "electron ."
+    "electron:dev": "electron electron-main.cjs",
+    "electron:build": "npm run build && electron-builder --win --x64 --publish never"
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -27,6 +31,30 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^4.0.0-alpha.18",
     "typescript": "^5.2.2",
-    "vite": "^5.3.1"
+    "vite": "^5.3.1",
+    "electron": "^31.3.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.soheil.tradingassistant",
+    "productName": "TradingAssistant",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron-main.cjs",
+      "preload.cjs"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Trading Assistant"
+    }
   }
 }

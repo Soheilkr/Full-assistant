@@ -1,140 +1,26 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&family=Vazirmatn:wght@300;400;500;700&display=swap');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Vazirmatn", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
-@layer base {
-  html, body {
-    overscroll-behavior-y: none;
-    overscroll-behavior-x: none;
-    overscroll-behavior: none;
-    overflow: hidden !important;
-  }
-  body {
-    @apply font-sans antialiased bg-slate-950 text-slate-100;
-    -webkit-tap-highlight-color: transparent;
-  }
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
-/* Custom glow & blink animations for different winrate phases */
-
-@keyframes blink-blue {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-@keyframes blink-green {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-@keyframes blink-orange {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-@keyframes blink-red {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-@keyframes blink-purple {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+::-webkit-scrollbar-track {
+  background: #1e293b;
 }
 
-@keyframes glow-card-blue {
-  0%, 100% { border-color: rgba(59, 130, 246, 0.45); }
-  50% { border-color: rgba(59, 130, 246, 0.15); }
-}
-@keyframes glow-card-green {
-  0%, 100% { border-color: rgba(16, 185, 129, 0.45); }
-  50% { border-color: rgba(16, 185, 129, 0.15); }
-}
-@keyframes glow-card-orange {
-  0%, 100% { border-color: rgba(245, 158, 11, 0.45); }
-  50% { border-color: rgba(245, 158, 11, 0.15); }
-}
-@keyframes glow-card-red {
-  0%, 100% { border-color: rgba(239, 68, 68, 0.5); }
-  50% { border-color: rgba(239, 68, 68, 0.15); }
-}
-@keyframes glow-card-purple {
-  0%, 100% { border-color: rgba(168, 85, 247, 0.45); }
-  50% { border-color: rgba(168, 85, 247, 0.15); }
+::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 3px;
 }
 
-.animate-blink-blue { animation: blink-blue 2s infinite ease-in-out; }
-.animate-blink-green { animation: blink-green 2s infinite ease-in-out; }
-.animate-blink-orange { animation: blink-orange 2s infinite ease-in-out; }
-.animate-blink-red { animation: blink-red 1.5s infinite ease-in-out; }
-.animate-blink-purple { animation: blink-purple 2s infinite ease-in-out; }
-
-.animate-glow-blue { animation: glow-card-blue 3s infinite ease-in-out; }
-.animate-glow-green { animation: glow-card-green 3s infinite ease-in-out; }
-.animate-glow-orange { animation: glow-card-orange 3s infinite ease-in-out; }
-.animate-glow-red { animation: glow-card-red 2s infinite ease-in-out; }
-.animate-glow-purple { animation: glow-card-purple 3s infinite ease-in-out; }
-
-/* Channel Strategy Mode Theme - Forest/Emerald Dark */
-.theme-channel {
-  --color-slate-950: #050907;
-  --color-slate-900: #0b120f;
-  --color-slate-800: #16241e;
-  --color-slate-700: #22362c;
+::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
 }
-
-/* BTB Strategy Mode Theme - Indigo Override + Warm Low-Glare Mid-Tone Theme Switch */
-.theme-btb {
-  --color-slate-950: #9e9a93; /* Cozy warm mid-tone gray-brown/cement background */
-  --color-slate-900: #beb9b0; /* Soft warm sandstone card background */
-  --color-slate-800: #8a867f; /* Warm earth borders */
-  --color-slate-700: #736f68; /* Warm accents */
-  --color-slate-600: #5c5953; /* Medium warm elements */
-  --color-slate-500: #45433e; /* Muted text */
-  --color-slate-400: #2e2d2a; /* Secondary readable text */
-  --color-slate-300: #1c1b19; /* Standard dark text */
-  --color-slate-200: #0f0e0d; /* Primary prominent text */
-  --color-slate-100: #050504; /* High-contrast charcoal text */
-  --color-slate-5: #000000;
-  --color-slate-50: #050504;
-
-  /* Harmonize Indigo colors for the warm sandstone/cement theme */
-  --color-indigo-50: #eaeefc;
-  --color-indigo-100: #d5defb;
-  --color-indigo-200: #c2ceff;
-  --color-indigo-300: #2e2380; /* Darker navy-indigo */
-  --color-indigo-400: #1c145a; /* Rich royal indigo text (high contrast) */
-  --color-indigo-500: #31259c;
-  --color-indigo-650: #31259c;
-  --color-indigo-600: #3c2fbf;
-  --color-indigo-700: #2c2194;
-  --color-indigo-800: #1d156b;
-  --color-indigo-900: #dbe0fc; /* Light lavender-blue backdrop */
-  --color-indigo-950: #ebedfc; /* Warm light-lavender backdrop tint */
-
-  /* Map Emerald/Wins to rich forest green so they are very visible on light theme */
-  --color-emerald-50: #e6f7f0;
-  --color-emerald-100: #c2eedc;
-  --color-emerald-200: #9ae2c6;
-  --color-emerald-300: #064e3b; /* Dark forest green text */
-  --color-emerald-400: #044b36; /* Dark green */
-  --color-emerald-500: #065f46;
-  --color-emerald-600: #047857;
-  --color-emerald-700: #065f46;
-  --color-emerald-800: #064e3b;
-  --color-emerald-900: #d1fae5; /* Soft light-green backdrop tint */
-  --color-emerald-950: #e6fbf1; /* Soft green backdrop */
-}
-
-/* Redirect animations to purple/indigo in BTB Mode */
-.theme-btb .animate-glow-green {
-  animation: glow-card-purple 3s infinite ease-in-out !important;
-}
-.theme-btb .animate-blink-green {
-  animation: blink-purple 2s infinite ease-in-out !important;
-}
-
-/* Rewrite custom drop shadows to use indigo instead of green in BTB mode */
-.theme-btb .shadow-\[0_0_20px_rgba\(16\2c 185\2c 129\2c 0\.5\)\] {
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.5) !important;
-}
-

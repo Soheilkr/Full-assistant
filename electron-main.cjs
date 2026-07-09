@@ -1,67 +1,47 @@
-const { app, BrowserWindow, ipcMain, dialog, desktopCapturer, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-let mainWindow = null;
-let hasActiveTrades = false;
+let mainWindow;
+
+// Dimensions config
+const UNFOLD_WIDTH = 1200; // Increased by 20% as requested (originally 1000)
+const UNFOLD_HEIGHT = 600;
+
+// Folded state dimensions:
+// Width: reduced by 75% (25% of unfolded: 1200 * 0.25 = 300)
+// Height: half of unfolded (600 * 0.5 = 300) -> which is exactly 3x the previous 100px fold height!
+const FOLD_WIDTH = 300;
+const FOLD_HEIGHT = 300;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 438,
-    height: 740,
-    minWidth: 420,
-    minHeight: 400,
-    maxWidth: 720,
-    maxHeight: 1200,
+    width: UNFOLD_WIDTH,
+    height: UNFOLD_HEIGHT,
+    frame: false, // Frameless UI for premium modern trading feel
+    transparent: false,
     resizable: true,
-    alwaysOnTop: false,
-    frame: true, // Use system frame for minimize/maximize/close buttons and title bar
     webPreferences: {
-      preload: path.join(__dirname, 'preload.cjs'),
+      nodeIntegration: false,
       contextIsolation: true,
-      nodeIntegration: false
+      preload: path.join(__dirname, 'preload.cjs')
     }
   });
 
-  // Load URL
-  if (process.env.VITE_DEV_URL) {
-    mainWindow.loadURL(process.env.VITE_DEV_URL);
-    // Open DevTools in dev mode
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
-  } else {
+  // In production, load the built index.html. In dev, load localhost:3000
+  if (process.env.NODE_ENV === 'production') {
     mainWindow.loadFile(path.join(__dirname, 'dist', 'index.html'));
+  } else {
+    mainWindow.loadURL('http://localhost:3000');
   }
 
-  mainWindow.on('closed', () => {
+  mainWindow.on('closed', function () {
     mainWindow = null;
-  });
-
-  // Handle close preventer if active trades are running
-  mainWindow.on('close', (e) => {
-    if (hasActiveTrades) {
-      const choice = dialog.showMessageBoxSync(mainWindow, {
-        type: 'warning',
-        buttons: ['Yes, Close', 'No, Keep Open'],
-        title: 'Confirm Exit',
-        message: 'You have active open trades! Are you sure you want to exit and close the assistant?',
-        defaultId: 1,
-        cancelId: 1
-      });
-      if (choice === 1) {
-        e.preventDefault();
-      }
-    }
   });
 }
 
-app.whenReady().then(() => {
+app.on('ready', () => {
   createWindow();
-
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow();
-    }
-  });
 });
 
 app.on('window-all-closed', () => {
@@ -70,113 +50,95 @@ app.on('window-all-closed', () => {
   }
 });
 
-// IPC Handler: Toggle window collapse
-ipcMain.on('set-window-collapsed', (event, collapsed) => {
+app.on('activate', () => {
+  if (mainWindow === null) {
+    createWindow();
+  }
+});
+
+// IPC Handler: Window Resize for Fold/Unfold State
+ipcMain.on('toggle-collapse', (event, collapsed) => {
   if (!mainWindow) return;
 
   if (collapsed) {
-    // Save current width or stick to default 438
-    mainWindow.setResizable(true);
-    mainWindow.setMinimumSize(420, 300);
-    mainWindow.setMaximumSize(720, 300);
-    mainWindow.setSize(438, 300);
+    // Fold state: Reduce width by 75%, and height is 300px (half of 600px, 3x the old 100px)
+    mainWindow.setSize(FOLD_WIDTH, FOLD_HEIGHT);
     mainWindow.setResizable(false);
   } else {
+    // Unfold state: Restore full dimensions
+    mainWindow.setSize(UNFOLD_WIDTH, UNFOLD_HEIGHT);
     mainWindow.setResizable(true);
-    mainWindow.setMinimumSize(420, 400);
-    mainWindow.setMaximumSize(720, 1200);
-    mainWindow.setSize(438, 740);
   }
 });
 
-// IPC Handler: Set always on top
-ipcMain.on('set-always-on-top', (event, alwaysOnTop) => {
-  if (!mainWindow) return;
-  mainWindow.setAlwaysOnTop(alwaysOnTop, 'screen-saver');
-});
-
-// IPC Handler: Update active trade state
-ipcMain.on('update-active-trade-state', (event, state) => {
-  hasActiveTrades = !!state;
-});
-
-// IPC Handler: Restore window
-ipcMain.on('restore-window', () => {
-  if (!mainWindow) return;
-  if (mainWindow.isMinimized()) {
-    mainWindow.restore();
-  }
-  mainWindow.focus();
-});
-
-// IPC Handler: Select directory
+// IPC Handler: Directory Selection
 ipcMain.handle('select-directory', async () => {
-  if (!mainWindow) return { success: false, path: '' };
-
+  if (!mainWindow) return null;
+  
   const result = await dialog.showOpenDialog(mainWindow, {
-    properties: ['openDirectory', 'createDirectory']
+    properties: ['openDirectory']
   });
-
-  if (result.canceled || result.filePaths.length === 0) {
-    return { success: false, path: '' };
-  }
-
-  return { success: true, path: result.filePaths[0] };
-});
-
-// IPC Handler: Save Excel / CSV file
-ipcMain.handle('save-excel-file', async (event, { folderPath, fileName, csvContent }) => {
-  try {
-    if (!fs.existsSync(folderPath)) {
-      fs.mkdirSync(folderPath, { recursive: true });
-    }
-
-    const fullPath = path.join(folderPath, fileName);
-    // Write using UTF-8 with BOM to support Persian characters in Excel
-    const bom = '\uFEFF';
-    fs.writeFileSync(fullPath, bom + csvContent, 'utf8');
-
-    return { success: true, path: fullPath };
-  } catch (error) {
-    console.error('Error saving Excel file:', error);
-    return { success: false, error: error.message };
+  
+  if (result.canceled) {
+    return null;
+  } else {
+    return result.filePaths[0];
   }
 });
 
-// IPC Handler: Take Screenshot
-ipcMain.handle('take-screenshot', async (event, { monitorIndex, folderPath, fileName }) => {
+// IPC Handler: Automatic Date-based Screenshot Writer
+ipcMain.handle('take-screenshot', async (event, baseDir) => {
+  if (!mainWindow) return { success: false, error: 'Window not initialized' };
+
   try {
-    const displays = screen.getAllDisplays();
-    const sources = await desktopCapturer.getSources({
-      types: ['screen'],
-      thumbnailSize: {
-        width: 1920,
-        height: 1080
-      }
-    });
+    // 1. Calculate today's date directory (YYYY-MM-DD)
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const dateDirName = `${year}-${month}-${day}`;
+    
+    // Target subfolder path
+    const targetDir = path.join(baseDir, dateDirName);
 
-    // Match source by monitorIndex, fallback to primary screen (index 0)
-    let selectedSource = sources[0];
-    if (monitorIndex !== undefined && monitorIndex < sources.length) {
-      selectedSource = sources[monitorIndex];
+    // 2. Automate creating directory if it doesn't exist (recursive)
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    if (!selectedSource) {
-      return { success: false, error: 'No display monitor screen was detected' };
-    }
+    // 3. Take native screenshot of the Electron window
+    const image = await mainWindow.webContents.capturePage();
+    const pngBuffer = image.toPNG();
 
-    const imageBuffer = selectedSource.thumbnail.toPNG();
+    // 4. Generate unique timestamped filename
+    const hour = String(now.getHours()).padStart(2, '0');
+    const min = String(now.getMinutes()).padStart(2, '0');
+    const sec = String(now.getSeconds()).padStart(2, '0');
+    const filename = `screenshot_${hour}-${min}-${sec}.png`;
+    const finalPath = path.join(targetDir, filename);
 
-    if (!fs.existsSync(folderPath)) {
-      fs.mkdirSync(folderPath, { recursive: true });
-    }
+    // 5. Write binary PNG data to directory
+    fs.writeFileSync(finalPath, pngBuffer);
 
-    const fullPath = path.join(folderPath, fileName);
-    fs.writeFileSync(fullPath, imageBuffer);
-
-    return { success: true, path: fullPath };
+    return { 
+      success: true, 
+      path: finalPath 
+    };
   } catch (error) {
-    console.error('Screenshot error:', error);
-    return { success: false, error: error.message };
+    console.error('Failed to take screenshot:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Unknown error occurred during screenshot write' 
+    };
+  }
+});
+
+ipcMain.on('close-app', () => {
+  app.quit();
+});
+
+ipcMain.on('minimize-app', () => {
+  if (mainWindow) {
+    mainWindow.minimize();
   }
 });

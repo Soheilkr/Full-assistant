@@ -869,7 +869,12 @@ export default function App() {
             selectedSoundType: 'default',
             volume: 80,
             playbackSeconds: 30,
-          }
+          },
+          customSystemRulesEn: merged.customSystemRulesEn,
+          customSystemRulesFa: merged.customSystemRulesFa,
+          rulesSpeaker1: merged.rulesSpeaker1,
+          rulesSpeaker2: merged.rulesSpeaker2,
+          dashboardSpeaker: merged.dashboardSpeaker,
         };
       }
     } catch (e) {
@@ -915,7 +920,12 @@ export default function App() {
         unfoldedHeight: 750,
         foldedWidth: 200,
         foldedHeight: 120,
-      }
+      },
+      customSystemRulesEn: undefined,
+      customSystemRulesFa: undefined,
+      rulesSpeaker1: undefined,
+      rulesSpeaker2: undefined,
+      dashboardSpeaker: undefined,
     };
   });
 
@@ -970,6 +980,9 @@ export default function App() {
   const [editingRuleIndex, setEditingRuleIndex] = useState<number | null>(null);
   const [editingRuleText, setEditingRuleText] = useState('');
   const [newAlarmTime, setNewAlarmTime] = useState('12:00');
+  const [isEditingSystemRules, setIsEditingSystemRules] = useState(false);
+  const [tempSystemRules, setTempSystemRules] = useState<string[]>([]);
+  const [rulesSpeakerPlaying, setRulesSpeakerPlaying] = useState<{sp1: boolean, sp2: boolean, dash: boolean}>({ sp1: false, sp2: false, dash: false });
 
   const [voiceGroups, setVoiceGroups] = useState<typeof defaultVoiceGroups>(() => {
     try {
@@ -1084,6 +1097,96 @@ export default function App() {
       setIsVoicePlaying(false);
     } catch (e) {
       console.error('Error stopping audio:', e);
+    }
+  };
+
+  const getRulesSpeakerText = (speakerNum: 1 | 2) => {
+    const defaultRulesEn = [
+      "Only trade based on the system when you follow price triggers and alerts, not by constantly staring at the chart. Set alerts, check positions, and step away from the chart until a stop loss or take profit is hit.",
+      "Your only duty is to follow the details of the plan and rules. Backtesting has proven that this strategy maintains its statistical edge in the long run.",
+      "Never double your trade volume in a way that is outside the plan. Increasing leverage causes emotional distress and prevents trades from reaching their final targets.",
+      "Never trade in tight ranging or market congestion. Switch the chart view to line charts to remove extra noise and prevent early entries due to boredom."
+    ];
+    const defaultRulesFa = [
+      "صرفاً زمانی بر اساس سیستم معامله کنید که بر اساس تریگرها و هشدارهای قیمتی پیش می‌روید، نه با زل زدن مکرر به چارت. آلارم‌ها را تنظیم کنید، موقعیت را بررسی کنید، و تا زمانی که حد ضرر یا سود لمس نشده، از چارت فاصله بگیرید.",
+      "تنها وظیفه شما دنبال کردن جزئیات برنامه و قوانین است. فرآیند بک‌تست ثابت کرده که این استراتژی برتری آماری (Edge) خود را در بلندمدت حفظ می‌کند.",
+      "هرگز حجم معاملات خود را به شیوه‌ای خارج از برنامه دو برابر نکنید. افزایش اهرم باعث اضطراب عاطفی شده و مانع از رسیدن معاملات به اهداف نهایی‌شان می‌شود.",
+      "هرگز در شرایط رنج فشرده یا تراکم بازار معامله نکنید. حالت چارت را به لاین (خطی) تعویض کنید تا نویزهای اضافی حذف شده و مانع ورودهای زودهنگام ناشی از بی‌حوصلگی شود."
+    ];
+
+    const systemRules = settings.appLanguage === 'en'
+      ? (settings.customSystemRulesEn || defaultRulesEn)
+      : (settings.customSystemRulesFa || defaultRulesFa);
+
+    return systemRules[speakerNum - 1] || "";
+  };
+
+  const playRulesSpeaker = (speakerId: 'sp1' | 'sp2' | 'dash', text?: string, audioUrl?: string) => {
+    stopRulesSpeaker();
+    if (!text && !audioUrl) return;
+
+    try {
+      let audio = document.getElementById('rules-speaker-audio') as HTMLAudioElement;
+      if (!audio) {
+        audio = document.createElement('audio');
+        audio.id = 'rules-speaker-audio';
+        audio.style.display = 'none';
+        document.body.appendChild(audio);
+      }
+      audio.setAttribute('referrerpolicy', 'no-referrer');
+      (audio as any).referrerPolicy = 'no-referrer';
+      audio.volume = (settings.voicePlaybackVolume ?? 80) / 100;
+
+      const onEndedOrError = () => {
+        setRulesSpeakerPlaying({ sp1: false, sp2: false, dash: false });
+        audio.removeEventListener('ended', onEndedOrError);
+        audio.removeEventListener('pause', onEndedOrError);
+        audio.removeEventListener('error', onEndedOrError);
+      };
+
+      audio.addEventListener('ended', onEndedOrError);
+      audio.addEventListener('pause', onEndedOrError);
+      audio.addEventListener('error', onEndedOrError);
+
+      setRulesSpeakerPlaying({
+        sp1: speakerId === 'sp1',
+        sp2: speakerId === 'sp2',
+        dash: speakerId === 'dash'
+      });
+
+      if (audioUrl) {
+        audio.src = audioUrl;
+        audio.play().catch(err => {
+          console.warn('Failed to play custom audio, falling back to TTS:', err);
+          if (text) {
+            const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=fa&client=tw-ob&q=${encodeURIComponent(text)}`;
+            audio.src = ttsUrl;
+            audio.play().catch(() => setRulesSpeakerPlaying({ sp1: false, sp2: false, dash: false }));
+          } else {
+            setRulesSpeakerPlaying({ sp1: false, sp2: false, dash: false });
+          }
+        });
+      } else if (text) {
+        const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=fa&client=tw-ob&q=${encodeURIComponent(text)}`;
+        audio.src = ttsUrl;
+        audio.play().catch(() => setRulesSpeakerPlaying({ sp1: false, sp2: false, dash: false }));
+      }
+    } catch (err) {
+      console.error('Error playing rules speaker:', err);
+      setRulesSpeakerPlaying({ sp1: false, sp2: false, dash: false });
+    }
+  };
+
+  const stopRulesSpeaker = () => {
+    try {
+      const audio = document.getElementById('rules-speaker-audio') as HTMLAudioElement;
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+      setRulesSpeakerPlaying({ sp1: false, sp2: false, dash: false });
+    } catch (err) {
+      console.error('Error stopping rules speaker:', err);
     }
   };
 
@@ -2794,14 +2897,15 @@ export default function App() {
     setIsSubmitting(false);
   };
 
-  const triggerScreenshot = async (type: 'entry' | 'reflection') => {
+  const triggerScreenshot = async (type: 'entry' | 'reflection', referenceTimestamp?: number) => {
     if (!settings.screenshotSettings?.enabled) {
       console.log('Screenshots are disabled in settings.');
       return;
     }
 
     try {
-      const today = format(new Date(), 'yyyy-MM-dd');
+      const targetDate = referenceTimestamp ? new Date(referenceTimestamp) : new Date();
+      const today = format(targetDate, 'yyyy-MM-dd');
       const timeStr = format(new Date(), 'HH-mm-ss');
       const strategy = strategyMode === 'btb' ? 'btb' : 'channel';
       const fileName = `${today}_${timeStr}_${strategy}_${type}.png`;
@@ -2817,6 +2921,7 @@ export default function App() {
           console.error(`Failed to save screenshot: ${result.error}`);
         }
       } else {
+        const simulatedPath = `${folderPath}\\${fileName}`;
         console.log(`[Web Preview - Screenshot Simulated] Folder: ${folderPath}, Monitor: ${monitorIndex + 1}, File: ${fileName}`);
       }
     } catch (e) {
@@ -2848,7 +2953,7 @@ export default function App() {
     setIsSubmitting(false);
 
     // Capture screenshot on log trade entry
-    triggerScreenshot('entry');
+    triggerScreenshot('entry', newTrade.timestamp);
   };
 
   const handlePostTradeSubmit = (id: string, result: TradeResult) => {
@@ -2960,7 +3065,7 @@ export default function App() {
     setCurrentTradeId(null);
 
     // Capture screenshot on reflection save
-    triggerScreenshot('reflection');
+    triggerScreenshot('reflection', trade?.timestamp);
   };
 
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -3131,17 +3236,22 @@ export default function App() {
   };
 
   const renderRules = () => {
-    const systemRules = settings.appLanguage === 'en' ? [
+    const defaultRulesEn = [
       "Only trade based on the system when you follow price triggers and alerts, not by constantly staring at the chart. Set alerts, check positions, and step away from the chart until a stop loss or take profit is hit.",
       "Your only duty is to follow the details of the plan and rules. Backtesting has proven that this strategy maintains its statistical edge in the long run.",
       "Never double your trade volume in a way that is outside the plan. Increasing leverage causes emotional distress and prevents trades from reaching their final targets.",
       "Never trade in tight ranging or market congestion. Switch the chart view to line charts to remove extra noise and prevent early entries due to boredom."
-    ] : [
+    ];
+    const defaultRulesFa = [
       "صرفاً زمانی بر اساس سیستم معامله کنید که بر اساس تریگرها و هشدارهای قیمتی پیش می‌روید، نه با زل زدن مکرر به چارت. آلارم‌ها را تنظیم کنید، موقعیت را بررسی کنید، و تا زمانی که حد ضرر یا سود لمس نشده، از چارت فاصله بگیرید.",
       "تنها وظیفه شما دنبال کردن جزئیات برنامه و قوانین است. فرآیند بک‌تست ثابت کرده که این استراتژی برتری آماری (Edge) خود را در بلندمدت حفظ می‌کند.",
       "هرگز حجم معاملات خود را به شیوه‌ای خارج از برنامه دو برابر نکنید. افزایش اهرم باعث اضطراب عاطفی شده و مانع از رسیدن معاملات به اهداف نهایی‌شان می‌شود.",
       "هرگز در شرایط رنج فشرده یا تراکم بازار معامله نکنید. حالت چارت را به لاین (خطی) تعویض کنید تا نویزهای اضافی حذف شده و مانع ورودهای زودهنگام ناشی از بی‌حوصلگی شود."
     ];
+
+    const systemRules = settings.appLanguage === 'en'
+      ? (settings.customSystemRulesEn || defaultRulesEn)
+      : (settings.customSystemRulesFa || defaultRulesFa);
 
     const sizingRules = settings.appLanguage === 'en' ? [
       `Maximum of ${settings.maxTradesPerDay} trades per day.`,
@@ -3212,25 +3322,147 @@ export default function App() {
           </div>
         </div>
 
+        {/* Minimalist Speakers Section */}
+        <div className="flex gap-4 items-center justify-center py-2 px-1">
+          {/* Speaker 1 */}
+          <button
+            onClick={() => {
+              if (rulesSpeakerPlaying.sp1) {
+                stopRulesSpeaker();
+              } else {
+                const sp = settings.rulesSpeaker1;
+                const fallbackText = getRulesSpeakerText(1);
+                playRulesSpeaker('sp1', fallbackText, sp?.audioUrl);
+              }
+            }}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-3 py-3 px-5 rounded-[24px] border transition-all cursor-pointer shadow-md select-none",
+              rulesSpeakerPlaying.sp1
+                ? "bg-rose-500/15 border-rose-500/30 text-rose-400 animate-pulse"
+                : (strategyMode === 'btb' ? "bg-slate-900/60 hover:bg-slate-900 border-indigo-500/20 text-slate-300" : "bg-slate-900/60 hover:bg-slate-900 border-amber-500/20 text-slate-300")
+            )}
+          >
+            {rulesSpeakerPlaying.sp1 ? (
+              <Square size={16} className="fill-rose-400 text-rose-400" />
+            ) : (
+              <Volume2 size={16} />
+            )}
+            <span className="text-xs font-bold font-sans">
+              {rulesSpeakerPlaying.sp1 
+                ? (settings.appLanguage === 'fa' ? "توقف پخش ۱" : "Stop Speaker 1") 
+                : (strategyMode === 'btb' ? "Btb rule 1" : "Channel rule 1")
+              }
+            </span>
+          </button>
+
+          {/* Speaker 2 */}
+          <button
+            onClick={() => {
+              if (rulesSpeakerPlaying.sp2) {
+                stopRulesSpeaker();
+              } else {
+                const sp = settings.rulesSpeaker2;
+                const fallbackText = getRulesSpeakerText(2);
+                playRulesSpeaker('sp2', fallbackText, sp?.audioUrl);
+              }
+            }}
+            className={cn(
+              "flex-1 flex items-center justify-center gap-3 py-3 px-5 rounded-[24px] border transition-all cursor-pointer shadow-md select-none",
+              rulesSpeakerPlaying.sp2
+                ? "bg-rose-500/15 border-rose-500/30 text-rose-400 animate-pulse"
+                : (strategyMode === 'btb' ? "bg-slate-900/60 hover:bg-slate-900 border-indigo-500/20 text-slate-300" : "bg-slate-900/60 hover:bg-slate-900 border-amber-500/20 text-slate-300")
+            )}
+          >
+            {rulesSpeakerPlaying.sp2 ? (
+              <Square size={16} className="fill-rose-400 text-rose-400" />
+            ) : (
+              <Volume2 size={16} />
+            )}
+            <span className="text-xs font-bold font-sans">
+              {rulesSpeakerPlaying.sp2 
+                ? (settings.appLanguage === 'fa' ? "توقف پخش ۲" : "Stop Speaker 2") 
+                : (strategyMode === 'btb' ? "Btb rule 2" : "Channel rule 2")
+              }
+            </span>
+          </button>
+        </div>
+
         {/* System Rules Section */}
         <div className="bg-slate-900/40 border border-indigo-500/20 rounded-[40px] p-6 relative overflow-hidden group shadow-xl">
-          <div className="flex items-center gap-3 mb-6 relative">
-            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
-              <Brain size={22} />
+          <div className="flex items-center justify-between mb-6 relative">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+                <Brain size={22} />
+              </div>
+              <h2 className="text-xl font-extrabold text-slate-100 tracking-tight">System Rules</h2>
             </div>
-            <h2 className="text-xl font-extrabold text-slate-100 tracking-tight">System Rules</h2>
+            
+            {!isEditingSystemRules ? (
+              <button
+                onClick={() => {
+                  setTempSystemRules([...systemRules]);
+                  setIsEditingSystemRules(true);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 text-indigo-400 hover:text-indigo-300 text-xs font-bold transition-all active:scale-95 cursor-pointer select-none"
+              >
+                <Edit size={12} />
+                <span>{settings.appLanguage === 'fa' ? 'ویرایش' : 'Edit'}</span>
+              </button>
+            ) : null}
           </div>
           
-          <ul className="space-y-6 relative" dir="rtl">
-            {systemRules.map((rule, idx) => (
-              <li key={`sys-${idx}`} className="flex items-start gap-4 text-right">
-                <div className="mt-2 w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)] flex-shrink-0" />
-                <p className="text-sm font-medium text-slate-300 leading-relaxed font-sans">
-                  {rule}
-                </p>
-              </li>
-            ))}
-          </ul>
+          {isEditingSystemRules ? (
+            <div className="space-y-4 relative text-right" dir="rtl">
+              {tempSystemRules.map((rule, idx) => (
+                <div key={`edit-rule-${idx}`} className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 font-mono">
+                    {settings.appLanguage === 'fa' ? `قانون سیستم ${idx + 1}` : `System Rule ${idx + 1}`}
+                  </label>
+                  <textarea
+                    value={rule}
+                    onChange={(e) => {
+                      const updated = [...tempSystemRules];
+                      updated[idx] = e.target.value;
+                      setTempSystemRules(updated);
+                    }}
+                    rows={2}
+                    className="w-full text-sm font-medium text-slate-200 bg-slate-950 border border-indigo-500/30 rounded-xl p-3 focus:outline-none focus:border-indigo-500 font-sans"
+                  />
+                </div>
+              ))}
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  onClick={() => setIsEditingSystemRules(false)}
+                  className="px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-300 text-xs font-bold transition-all active:scale-95 cursor-pointer select-none"
+                >
+                  {settings.appLanguage === 'fa' ? 'انصراف' : 'Cancel'}
+                </button>
+                <button
+                  onClick={() => {
+                    setSettings(prev => ({
+                      ...prev,
+                      [settings.appLanguage === 'en' ? 'customSystemRulesEn' : 'customSystemRulesFa']: tempSystemRules
+                    }));
+                    setIsEditingSystemRules(false);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all active:scale-95 cursor-pointer select-none"
+                >
+                  {settings.appLanguage === 'fa' ? 'ذخیره' : 'Save'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <ul className="space-y-6 relative" dir="rtl">
+              {systemRules.map((rule, idx) => (
+                <li key={`sys-${idx}`} className="flex items-start gap-4 text-right">
+                  <div className="mt-2 w-2 h-2 rounded-full bg-indigo-500 shadow-[0_0_8px_rgba(99,102,241,0.6)] flex-shrink-0" />
+                  <p className="text-sm font-medium text-slate-300 leading-relaxed font-sans text-right">
+                    {rule}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Position Sizing Rules Section */}
@@ -3370,6 +3602,39 @@ export default function App() {
           </div>
           <div className="text-lg font-black text-slate-100 font-mono leading-none">{lossCount}</div>
         </div>
+      </div>
+
+      {/* Minimalist Speakers Section */}
+      <div className="flex gap-4 items-center justify-center py-2 px-1">
+        {/* Play Sound Speaker */}
+        <button
+          onClick={() => {
+            if (rulesSpeakerPlaying.dash) {
+              stopRulesSpeaker();
+            } else {
+              const sp = settings.dashboardSpeaker;
+              playRulesSpeaker('dash', "پخش صدای دلخواه صفحه سی", sp?.audioUrl);
+            }
+          }}
+          className={cn(
+            "w-full flex items-center justify-center gap-3 py-3 px-5 rounded-[24px] border transition-all cursor-pointer shadow-md select-none",
+            rulesSpeakerPlaying.dash
+              ? "bg-rose-500/15 border-rose-500/30 text-rose-400 animate-pulse"
+              : (strategyMode === 'btb' ? "bg-slate-900/60 hover:bg-slate-900 border-indigo-500/20 text-slate-300" : "bg-slate-900/60 hover:bg-slate-900 border-amber-500/20 text-slate-300")
+          )}
+        >
+          {rulesSpeakerPlaying.dash ? (
+            <Square size={16} className="fill-rose-400 text-rose-400" />
+          ) : (
+            <Volume2 size={16} />
+          )}
+          <span className="text-xs font-bold font-sans">
+            {rulesSpeakerPlaying.dash 
+              ? (settings.appLanguage === 'fa' ? "توقف پخش" : "Stop sound") 
+              : "play sound"
+            }
+          </span>
+        </button>
       </div>
 
       {/* Rule Alerts */}
@@ -6355,6 +6620,264 @@ export default function App() {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Section 5: Rules Page Speakers (بلندگوهای صفحه قوانین) */}
+        <div className="space-y-6 border-t border-slate-800 pt-6 text-left">
+          <div className="flex justify-between items-center bg-slate-950/40 p-3.5 rounded-2xl border border-slate-800/80 mb-2 select-none">
+            <div className="flex items-center gap-2">
+              <Volume2 size={16} className={strategyMode === 'btb' ? "text-indigo-400" : "text-amber-400"} />
+              <span className="text-xs font-black text-slate-300 uppercase tracking-wider font-sans">Speakers Configuration (تنظیمات بلندگوهای برنامه)</span>
+            </div>
+            <span className="text-[9px] font-mono text-slate-500 uppercase font-black bg-slate-900 px-2 py-0.5 rounded border border-slate-800/60">Speakers B & C</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-slate-950/40 p-5 rounded-3xl border border-slate-800/65 text-left">
+            {/* Speaker 1 Config */}
+            <div className="bg-slate-950 p-4 rounded-2.5xl border border-slate-800/60 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                <div className="flex items-center gap-2">
+                  <Volume2 size={14} className={strategyMode === 'btb' ? "text-indigo-400" : "text-amber-400"} />
+                  <span className="text-xs font-black text-slate-200 uppercase tracking-wider font-sans">Speaker 1 Settings (بلندگو ۱)</span>
+                </div>
+                {settings.rulesSpeaker1?.audioUrl && (
+                  <button
+                    onClick={() => {
+                      setSettings(prev => ({
+                        ...prev,
+                        rulesSpeaker1: {
+                          ...prev.rulesSpeaker1,
+                          audioUrl: undefined
+                        }
+                      }));
+                    }}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 transition-colors font-bold"
+                  >
+                    Remove Audio File
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Upload Audio File (بارگذاری فایل صوتی)
+                  </label>
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                           const base64 = event.target?.result as string;
+                           setSettings(prev => ({
+                             ...prev,
+                             rulesSpeaker1: {
+                               ...(prev.rulesSpeaker1 || {}),
+                               audioUrl: base64
+                             }
+                           }));
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full bg-slate-900 text-slate-400 text-xs rounded-xl border border-slate-800 px-3 py-1.5 focus:outline-none cursor-pointer file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-500/10 file:text-indigo-400 hover:file:bg-indigo-500/20"
+                  />
+                  {settings.rulesSpeaker1?.audioUrl ? (
+                    <p className="text-[9px] text-emerald-400 font-bold mt-1">✓ Custom Audio loaded successfully</p>
+                  ) : (
+                    <p className="text-[9px] text-slate-500 mt-1">Uses Persian TTS (Google) fallback to read first rule if no custom audio file is uploaded.</p>
+                  )}
+                </div>
+
+                {/* Test button */}
+                <button
+                  onClick={() => {
+                    if (rulesSpeakerPlaying.sp1) {
+                      stopRulesSpeaker();
+                    } else {
+                      const fallbackText = getRulesSpeakerText(1);
+                      playRulesSpeaker('sp1', fallbackText, settings.rulesSpeaker1?.audioUrl);
+                    }
+                  }}
+                  className={cn(
+                    "w-full py-2 px-4 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2",
+                    rulesSpeakerPlaying.sp1
+                      ? "bg-rose-500/15 border-rose-500/30 text-rose-400"
+                      : "bg-slate-900 border-slate-800 hover:bg-slate-800 text-slate-300"
+                  )}
+                >
+                  {rulesSpeakerPlaying.sp1 ? <Square size={12} className="fill-rose-400 text-rose-400" /> : <Volume2 size={12} />}
+                  <span>{rulesSpeakerPlaying.sp1 ? "Stop Testing" : "Test Speaker 1"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Speaker 2 Config */}
+            <div className="bg-slate-950 p-4 rounded-2.5xl border border-slate-800/60 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                <div className="flex items-center gap-2">
+                  <Volume2 size={14} className={strategyMode === 'btb' ? "text-indigo-400" : "text-amber-400"} />
+                  <span className="text-xs font-black text-slate-200 uppercase tracking-wider font-sans">Speaker 2 Settings (بلندگو ۲)</span>
+                </div>
+                {settings.rulesSpeaker2?.audioUrl && (
+                  <button
+                    onClick={() => {
+                      setSettings(prev => ({
+                        ...prev,
+                        rulesSpeaker2: {
+                          ...prev.rulesSpeaker2,
+                          audioUrl: undefined
+                        }
+                      }));
+                    }}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 transition-colors font-bold"
+                  >
+                    Remove Audio File
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Upload Audio File (بارگذاری فایل صوتی)
+                  </label>
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                           const base64 = event.target?.result as string;
+                           setSettings(prev => ({
+                             ...prev,
+                             rulesSpeaker2: {
+                               ...(prev.rulesSpeaker2 || {}),
+                               audioUrl: base64
+                             }
+                           }));
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full bg-slate-900 text-slate-400 text-xs rounded-xl border border-slate-800 px-3 py-1.5 focus:outline-none cursor-pointer file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-500/10 file:text-indigo-400 hover:file:bg-indigo-500/20"
+                  />
+                  {settings.rulesSpeaker2?.audioUrl ? (
+                    <p className="text-[9px] text-emerald-400 font-bold mt-1">✓ Custom Audio loaded successfully</p>
+                  ) : (
+                    <p className="text-[9px] text-slate-500 mt-1">Uses Persian TTS (Google) fallback to read second rule if no custom audio file is uploaded.</p>
+                  )}
+                </div>
+
+                {/* Test button */}
+                <button
+                  onClick={() => {
+                    if (rulesSpeakerPlaying.sp2) {
+                      stopRulesSpeaker();
+                    } else {
+                      const fallbackText = getRulesSpeakerText(2);
+                      playRulesSpeaker('sp2', fallbackText, settings.rulesSpeaker2?.audioUrl);
+                    }
+                  }}
+                  className={cn(
+                    "w-full py-2 px-4 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2",
+                    rulesSpeakerPlaying.sp2
+                      ? "bg-rose-500/15 border-rose-500/30 text-rose-400"
+                      : "bg-slate-900 border-slate-800 hover:bg-slate-800 text-slate-300"
+                  )}
+                >
+                  {rulesSpeakerPlaying.sp2 ? <Square size={12} className="fill-rose-400 text-rose-400" /> : <Volume2 size={12} />}
+                  <span>{rulesSpeakerPlaying.sp2 ? "Stop Testing" : "Test Speaker 2"}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Dashboard Speaker Config (Page C) */}
+            <div className="bg-slate-950 p-4 rounded-2.5xl border border-slate-800/60 space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-900 pb-2">
+                <div className="flex items-center gap-2">
+                  <Volume2 size={14} className={strategyMode === 'btb' ? "text-indigo-400" : "text-amber-400"} />
+                  <span className="text-xs font-black text-slate-200 uppercase tracking-wider font-sans">Dashboard Speaker Settings (بلندگو صفحه C)</span>
+                </div>
+                {settings.dashboardSpeaker?.audioUrl && (
+                  <button
+                    onClick={() => {
+                      setSettings(prev => ({
+                        ...prev,
+                        dashboardSpeaker: {
+                          ...prev.dashboardSpeaker,
+                          audioUrl: undefined
+                        }
+                      }));
+                    }}
+                    className="text-[10px] text-rose-400 hover:text-rose-300 transition-colors font-bold"
+                  >
+                    Remove Audio File
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Upload Audio File (بارگذاری فایل صوتی)
+                  </label>
+                  <input
+                    type="file"
+                    accept="audio/*"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                           const base64 = event.target?.result as string;
+                           setSettings(prev => ({
+                             ...prev,
+                             dashboardSpeaker: {
+                               ...(prev.dashboardSpeaker || {}),
+                               audioUrl: base64
+                             }
+                           }));
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                    className="w-full bg-slate-900 text-slate-400 text-xs rounded-xl border border-slate-800 px-3 py-1.5 focus:outline-none cursor-pointer file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-500/10 file:text-indigo-400 hover:file:bg-indigo-500/20"
+                  />
+                  {settings.dashboardSpeaker?.audioUrl ? (
+                    <p className="text-[9px] text-emerald-400 font-bold mt-1">✓ Custom Audio loaded successfully</p>
+                  ) : (
+                    <p className="text-[9px] text-slate-500 mt-1">Uses Persian TTS (Google) fallback to read "play sound" if no custom audio file is uploaded.</p>
+                  )}
+                </div>
+
+                {/* Test button */}
+                <button
+                  onClick={() => {
+                    if (rulesSpeakerPlaying.dash) {
+                      stopRulesSpeaker();
+                    } else {
+                      playRulesSpeaker('dash', "پخش صدای دلخواه صفحه سی", settings.dashboardSpeaker?.audioUrl);
+                    }
+                  }}
+                  className={cn(
+                    "w-full py-2 px-4 rounded-xl border text-xs font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-2",
+                    rulesSpeakerPlaying.dash
+                      ? "bg-rose-500/15 border-rose-500/30 text-rose-400"
+                      : "bg-slate-900 border-slate-800 hover:bg-slate-800 text-slate-300"
+                  )}
+                >
+                  {rulesSpeakerPlaying.dash ? <Square size={12} className="fill-rose-400 text-rose-400" /> : <Volume2 size={12} />}
+                  <span>{rulesSpeakerPlaying.dash ? "Stop Testing" : "Test Speaker C"}</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

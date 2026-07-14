@@ -70,6 +70,18 @@ export interface Settings {
     seedHistoryString: string;
   };
   strategyRules?: string[];
+  customSystemRulesEn?: string[];
+  customSystemRulesFa?: string[];
+  rulesSpeaker1?: {
+    text?: string;
+    audioUrl?: string;
+    fileName?: string;
+  };
+  rulesSpeaker2?: {
+    text?: string;
+    audioUrl?: string;
+    fileName?: string;
+  };
   passcodeEnabled?: boolean;
   passcode?: string;
   alarmSettings?: AlarmSettings;

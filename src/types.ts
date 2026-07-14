@@ -82,6 +82,11 @@ export interface Settings {
     audioUrl?: string;
     fileName?: string;
   };
+  dashboardSpeaker?: {
+    text?: string;
+    audioUrl?: string;
+    fileName?: string;
+  };
   passcodeEnabled?: boolean;
   passcode?: string;
   alarmSettings?: AlarmSettings;

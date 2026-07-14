@@ -145,15 +145,24 @@ class AudioStorage {
   static async saveAudio(key: string, base64Data: string): Promise<void> {
     try {
       const db = await this.getDB();
-      return new Promise((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         const transaction = db.transaction(this.storeName, 'readwrite');
         const store = transaction.objectStore(this.storeName);
         const request = store.put(base64Data, key);
         request.onsuccess = () => resolve();
         request.onerror = () => reject(request.error);
       });
+
+      // Synchronize to Electron disk fallback asynchronously
+      if (typeof window !== 'undefined' && 'electronAPI' in window) {
+        const api = (window as any).electronAPI;
+        if (api && typeof api.saveLargeAudio === 'function') {
+          console.log(`Saving custom audio "${key}" to Electron disk storage...`);
+          await api.saveLargeAudio(key, base64Data);
+        }
+      }
     } catch (e) {
-      console.error('Failed to save to IndexedDB', e);
+      console.error('Failed to save to IndexedDB or Electron disk:', e);
     }
   }
 
@@ -1517,6 +1526,11 @@ export default function App() {
       passcodeEnabled: settings.passcodeEnabled,
       passcode: settings.passcode,
       windowDimensions: settings.windowDimensions,
+      customSystemRulesEn: settings.customSystemRulesEn,
+      customSystemRulesFa: settings.customSystemRulesFa,
+      rulesSpeaker1: settings.rulesSpeaker1,
+      rulesSpeaker2: settings.rulesSpeaker2,
+      dashboardSpeaker: settings.dashboardSpeaker,
     };
     localStorage.setItem('trading_global_settings', JSON.stringify(globalSettings));
   }, [settings, strategyMode]);
@@ -1753,7 +1767,12 @@ export default function App() {
             unfoldedHeight: 750,
             foldedWidth: 200,
             foldedHeight: 120,
-          }
+          },
+          customSystemRulesEn: merged.customSystemRulesEn,
+          customSystemRulesFa: merged.customSystemRulesFa,
+          rulesSpeaker1: merged.rulesSpeaker1,
+          rulesSpeaker2: merged.rulesSpeaker2,
+          dashboardSpeaker: merged.dashboardSpeaker,
         };
       } else {
         newSettings = {
@@ -1770,6 +1789,11 @@ export default function App() {
           passcodeEnabled: settings.passcodeEnabled,
           passcode: settings.passcode,
           windowDimensions: settings.windowDimensions,
+          customSystemRulesEn: settings.customSystemRulesEn,
+          customSystemRulesFa: settings.customSystemRulesFa,
+          rulesSpeaker1: settings.rulesSpeaker1,
+          rulesSpeaker2: settings.rulesSpeaker2,
+          dashboardSpeaker: settings.dashboardSpeaker,
         };
       }
     } catch (e) {}
@@ -2361,7 +2385,12 @@ export default function App() {
               customSoundBase64: settingsToLoad.alarmSettings.customSoundBase64,
               customSoundName: settingsToLoad.alarmSettings.customSoundName,
               selectedSoundType: settingsToLoad.alarmSettings.selectedSoundType ?? 'default',
-            } : settings.alarmSettings
+            } : settings.alarmSettings,
+            customSystemRulesEn: settingsToLoad.customSystemRulesEn ?? settings.customSystemRulesEn,
+            customSystemRulesFa: settingsToLoad.customSystemRulesFa ?? settings.customSystemRulesFa,
+            rulesSpeaker1: settingsToLoad.rulesSpeaker1 ?? settings.rulesSpeaker1,
+            rulesSpeaker2: settingsToLoad.rulesSpeaker2 ?? settings.rulesSpeaker2,
+            dashboardSpeaker: settingsToLoad.dashboardSpeaker ?? settings.dashboardSpeaker,
           };
 
           setSettings(validatedSettings);

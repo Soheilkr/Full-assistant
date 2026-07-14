@@ -283,6 +283,24 @@ ipcMain.handle('load-large-audio', async (event, { spKey }) => {
   }
 });
 
+// IPC Handler: Save large audio file asynchronously to disk
+ipcMain.handle('save-large-audio', async (event, { spKey, data }) => {
+  try {
+    const userDataPath = app.getPath('userData');
+    const storageDir = path.join(userDataPath, 'btb_storage');
+    if (!fs.existsSync(storageDir)) {
+      fs.mkdirSync(storageDir, { recursive: true });
+    }
+    const audioKey = `audio_${spKey}`;
+    const audioFilePath = path.join(storageDir, `${audioKey}.json`);
+    fs.writeFileSync(audioFilePath, JSON.stringify({ data }), 'utf8');
+    return { success: true };
+  } catch (error) {
+    console.error(`Error saving large audio for ${spKey}:`, error);
+    return { success: false, error: error.message };
+  }
+});
+
 // IPC Handler: Synchronous clear all states
 ipcMain.on('clear-all-states-sync', (event) => {
   try {

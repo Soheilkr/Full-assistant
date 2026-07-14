@@ -10,5 +10,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectDirectory: () => ipcRenderer.invoke('select-directory'),
   saveStateSync: (key, data) => ipcRenderer.sendSync('save-state-sync', { key, data }),
   loadStateSync: (key) => ipcRenderer.sendSync('load-state-sync', { key }),
-  clearAllStatesSync: () => ipcRenderer.sendSync('clear-all-states-sync')
+  clearAllStatesSync: () => ipcRenderer.sendSync('clear-all-states-sync'),
+  loadLargeAudio: (spKey) => ipcRenderer.invoke('load-large-audio', { spKey })
 });

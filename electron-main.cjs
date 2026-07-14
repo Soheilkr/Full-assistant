@@ -225,7 +225,33 @@ ipcMain.on('load-state-sync', (event, { key }) => {
     if (fs.existsSync(filePath)) {
       const content = fs.readFileSync(filePath, 'utf8');
       try {
-        event.returnValue = { success: true, data: JSON.parse(content) };
+        let data = JSON.parse(content);
+
+        // Clean up large Base64 audio strings synchronously to avoid IPC payload crash
+        let hasLargeAudio = false;
+        if (data && typeof data === 'object') {
+          const speakers = ['rulesSpeaker1', 'rulesSpeaker2', 'dashboardSpeaker'];
+          for (const spKey of speakers) {
+            if (data[spKey] && data[spKey].audioUrl && data[spKey].audioUrl.startsWith('data:')) {
+              const audioKey = `audio_${spKey}`;
+              const audioFilePath = path.join(userDataPath, 'btb_storage', `${audioKey}.json`);
+              try {
+                fs.writeFileSync(audioFilePath, JSON.stringify({ data: data[spKey].audioUrl }), 'utf8');
+                console.log(`Migrated large audio data for ${spKey} from ${key}.json to separate file.`);
+              } catch (writeErr) {
+                console.error(`Failed to migrate large audio for ${spKey}:`, writeErr);
+              }
+              data[spKey].audioUrl = `indexeddb://${spKey}`;
+              hasLargeAudio = true;
+            }
+          }
+        }
+
+        if (hasLargeAudio) {
+          fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+        }
+
+        event.returnValue = { success: true, data };
       } catch (parseErr) {
         // Fallback: If not valid JSON, treat as raw string value safely
         event.returnValue = { success: true, data: content };
@@ -236,6 +262,24 @@ ipcMain.on('load-state-sync', (event, { key }) => {
   } catch (error) {
     console.error(`Error loading state sync for ${key}:`, error);
     event.returnValue = { success: false, error: error.message };
+  }
+});
+
+// IPC Handler: Load large audio file asynchronously when requested
+ipcMain.handle('load-large-audio', async (event, { spKey }) => {
+  try {
+    const userDataPath = app.getPath('userData');
+    const audioKey = `audio_${spKey}`;
+    const audioFilePath = path.join(userDataPath, 'btb_storage', `${audioKey}.json`);
+    if (fs.existsSync(audioFilePath)) {
+      const content = fs.readFileSync(audioFilePath, 'utf8');
+      const parsed = JSON.parse(content);
+      return { success: true, data: parsed.data };
+    }
+    return { success: false, error: 'Audio file not found on disk' };
+  } catch (error) {
+    console.error(`Error loading large audio for ${spKey}:`, error);
+    return { success: false, error: error.message };
   }
 });
 

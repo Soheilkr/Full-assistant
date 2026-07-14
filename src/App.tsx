@@ -197,6 +197,21 @@ const resolveAudioUrl = async (url?: string): Promise<string> => {
       if (data) {
         return data;
       }
+
+      // Fallback: If not in IndexedDB but we are in Electron, check if it was migrated to disk
+      if (typeof window !== 'undefined' && 'electronAPI' in window) {
+        const api = (window as any).electronAPI;
+        if (api && typeof api.loadLargeAudio === 'function') {
+          console.log(`Audio key "${key}" not found in IndexedDB. Attempting fallback from Electron disk...`);
+          const res = await api.loadLargeAudio(key);
+          if (res && res.success && res.data) {
+            // Save it to IndexedDB so subsequent loads are immediate
+            await AudioStorage.saveAudio(key, res.data);
+            console.log(`Successfully restored custom audio "${key}" from disk into IndexedDB.`);
+            return res.data;
+          }
+        }
+      }
     } catch (err) {
       console.error('Error resolving indexeddb URL:', err);
     }

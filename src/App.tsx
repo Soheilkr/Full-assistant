@@ -120,6 +120,90 @@ if (typeof window !== 'undefined' && 'electronAPI' in window) {
   };
 }
 
+class AudioStorage {
+  private static dbName = 'TradingAppAudioStore';
+  private static storeName = 'audioFiles';
+
+  static getDB(): Promise<IDBDatabase> {
+    return new Promise((resolve, reject) => {
+      if (typeof indexedDB === 'undefined') {
+        reject(new Error('IndexedDB is not supported'));
+        return;
+      }
+      const request = indexedDB.open(this.dbName, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(this.storeName)) {
+          db.createObjectStore(this.storeName);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  static async saveAudio(key: string, base64Data: string): Promise<void> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(this.storeName, 'readwrite');
+        const store = transaction.objectStore(this.storeName);
+        const request = store.put(base64Data, key);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.error('Failed to save to IndexedDB', e);
+    }
+  }
+
+  static async getAudio(key: string): Promise<string | null> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(this.storeName, 'readonly');
+        const store = transaction.objectStore(this.storeName);
+        const request = store.get(key);
+        request.onsuccess = () => resolve(request.result || null);
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.error('Failed to get from IndexedDB', e);
+      return null;
+    }
+  }
+
+  static async deleteAudio(key: string): Promise<void> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve, reject) => {
+        const transaction = db.transaction(this.storeName, 'readwrite');
+        const store = transaction.objectStore(this.storeName);
+        const request = store.delete(key);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
+    } catch (e) {
+      console.error('Failed to delete from IndexedDB', e);
+    }
+  }
+}
+
+const resolveAudioUrl = async (url?: string): Promise<string> => {
+  if (url && url.startsWith('indexeddb://')) {
+    const key = url.replace('indexeddb://', '');
+    try {
+      const data = await AudioStorage.getAudio(key);
+      if (data) {
+        return data;
+      }
+    } catch (err) {
+      console.error('Error resolving indexeddb URL:', err);
+    }
+  }
+  return url || '';
+};
+
 // Page IDs for reference as requested
 const PAGES = {
   WELCOME: "A",
@@ -1121,7 +1205,7 @@ export default function App() {
     return systemRules[speakerNum - 1] || "";
   };
 
-  const playRulesSpeaker = (speakerId: 'sp1' | 'sp2' | 'dash', text?: string, audioUrl?: string) => {
+  const playRulesSpeaker = async (speakerId: 'sp1' | 'sp2' | 'dash', text?: string, audioUrl?: string) => {
     stopRulesSpeaker();
     if (!text && !audioUrl) return;
 
@@ -1155,7 +1239,8 @@ export default function App() {
       });
 
       if (audioUrl) {
-        audio.src = audioUrl;
+        const resolvedUrl = await resolveAudioUrl(audioUrl);
+        audio.src = resolvedUrl;
         audio.play().catch(err => {
           console.warn('Failed to play custom audio, falling back to TTS:', err);
           if (text) {
@@ -1190,7 +1275,7 @@ export default function App() {
     }
   };
 
-  const speakText = (input: string | { text: string; audioUrl?: string }) => {
+  const speakText = async (input: string | { text: string; audioUrl?: string }) => {
     if (!input) return;
 
     let text = '';
@@ -1239,8 +1324,9 @@ export default function App() {
       
       // If a custom audio URL/path is specified, prioritize playing that directly!
       if (audioUrl) {
-        console.log('Playing custom voice audio from URL/path:', audioUrl);
-        audio.src = audioUrl;
+        const resolvedUrl = await resolveAudioUrl(audioUrl);
+        console.log('Playing custom voice audio from URL/path:', resolvedUrl ? resolvedUrl.substring(0, 100) + '...' : '');
+        audio.src = resolvedUrl;
         const playPromise = audio.play();
         if (playPromise instanceof Promise) {
           playPromise.catch(err => {
@@ -6643,7 +6729,8 @@ export default function App() {
                 </div>
                 {settings.rulesSpeaker1?.audioUrl && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
+                      await AudioStorage.deleteAudio('rulesSpeaker1');
                       setSettings(prev => ({
                         ...prev,
                         rulesSpeaker1: {
@@ -6671,13 +6758,14 @@ export default function App() {
                       const file = e.target.files?.[0];
                       if (file) {
                         const reader = new FileReader();
-                        reader.onload = (event) => {
+                        reader.onload = async (event) => {
                            const base64 = event.target?.result as string;
+                           await AudioStorage.saveAudio('rulesSpeaker1', base64);
                            setSettings(prev => ({
                              ...prev,
                              rulesSpeaker1: {
                                ...(prev.rulesSpeaker1 || {}),
-                               audioUrl: base64
+                               audioUrl: 'indexeddb://rulesSpeaker1'
                              }
                            }));
                         };
@@ -6725,7 +6813,8 @@ export default function App() {
                 </div>
                 {settings.rulesSpeaker2?.audioUrl && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
+                      await AudioStorage.deleteAudio('rulesSpeaker2');
                       setSettings(prev => ({
                         ...prev,
                         rulesSpeaker2: {
@@ -6753,13 +6842,14 @@ export default function App() {
                       const file = e.target.files?.[0];
                       if (file) {
                         const reader = new FileReader();
-                        reader.onload = (event) => {
+                        reader.onload = async (event) => {
                            const base64 = event.target?.result as string;
+                           await AudioStorage.saveAudio('rulesSpeaker2', base64);
                            setSettings(prev => ({
                              ...prev,
                              rulesSpeaker2: {
                                ...(prev.rulesSpeaker2 || {}),
-                               audioUrl: base64
+                               audioUrl: 'indexeddb://rulesSpeaker2'
                              }
                            }));
                         };
@@ -6807,7 +6897,8 @@ export default function App() {
                 </div>
                 {settings.dashboardSpeaker?.audioUrl && (
                   <button
-                    onClick={() => {
+                    onClick={async () => {
+                      await AudioStorage.deleteAudio('dashboardSpeaker');
                       setSettings(prev => ({
                         ...prev,
                         dashboardSpeaker: {
@@ -6835,13 +6926,14 @@ export default function App() {
                       const file = e.target.files?.[0];
                       if (file) {
                         const reader = new FileReader();
-                        reader.onload = (event) => {
+                        reader.onload = async (event) => {
                            const base64 = event.target?.result as string;
+                           await AudioStorage.saveAudio('dashboardSpeaker', base64);
                            setSettings(prev => ({
                              ...prev,
                              dashboardSpeaker: {
                                ...(prev.dashboardSpeaker || {}),
-                               audioUrl: base64
+                               audioUrl: 'indexeddb://dashboardSpeaker'
                              }
                            }));
                         };

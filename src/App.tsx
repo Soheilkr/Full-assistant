@@ -13,6 +13,21 @@ import { Trade, DailyState, TradeResult, PSYCHOLOGY_TIPS, PSYCHOLOGY_TIPS_EN, Hi
 import { RiskManager } from './lib/riskManager';
 import { t } from './translations';
 
+const safeFormat = (date: any, formatStr: string, fallback: string = ''): string => {
+  if (!date) return fallback;
+  try {
+    const d = typeof date === 'number' ? new Date(date) : date;
+    // Check if d is a valid Date
+    if (d instanceof Date && isNaN(d.getTime())) {
+      return fallback;
+    }
+    return format(d, formatStr);
+  } catch (err) {
+    console.error('safeFormat failed for date:', date, 'format:', formatStr, err);
+    return fallback;
+  }
+};
+
 // Electron storage persistence decorator with Memory Cache to avoid high CPU usage & disk bottleneck
 if (typeof window !== 'undefined' && 'electronAPI' in window) {
   const originalGetItem = Storage.prototype.getItem;
@@ -42,7 +57,11 @@ if (typeof window !== 'undefined' && 'electronAPI' in window) {
           storageCache[key] = stringified;
           synchronizedKeys.add(key);
           // Sync to standard localStorage too so they stay aligned
-          originalSetItem.call(this, key, stringified);
+          try {
+            originalSetItem.call(this, key, stringified);
+          } catch (e) {
+            console.warn(`[Storage Override] Failed to sync loaded key "${key}" to standard localStorage (continuing with memory/file cache):`, e);
+          }
           return stringified;
         }
       } catch (err) {
@@ -63,9 +82,15 @@ if (typeof window !== 'undefined' && 'electronAPI' in window) {
       return;
     }
 
-    // Update memory cache and standard localStorage
+    // Update memory cache
     storageCache[key] = value;
-    originalSetItem.call(this, key, value);
+    
+    // Safely write to standard localStorage cache
+    try {
+      originalSetItem.call(this, key, value);
+    } catch (err) {
+      console.warn(`[Storage Override] Failed to write key "${key}" to standard localStorage (continuing with memory/file cache):`, err);
+    }
 
     // Save to Electron file storage
     const api = (window as any).electronAPI;
@@ -2495,7 +2520,7 @@ export default function App() {
     const csvRows = [headers.join(',')];
 
     allTrades.forEach((t, index) => {
-      const timeStr = format(t.timestamp, 'HH:mm:ss');
+      const timeStr = safeFormat(t.timestamp, 'HH:mm:ss');
       
       let resultEng = 'PENDING';
       if (t.result === 'TP') resultEng = 'TP';
@@ -4004,7 +4029,7 @@ export default function App() {
                   <div className="text-left">
                     <p className="font-bold text-sm text-slate-200">Trade #{idx + 1}</p>
                     <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                      <p className="text-[10px] text-slate-500 font-mono">{format(trade.timestamp, 'HH:mm')}</p>
+                      <p className="text-[10px] text-slate-500 font-mono">{safeFormat(trade.timestamp, 'HH:mm')}</p>
                       {trade.tradeCondition && (
                         <span className={cn(
                           "text-[9px] px-1.5 py-0.5 rounded font-sans border font-black",
@@ -7493,7 +7518,7 @@ export default function App() {
                           وینریت ورود: {trade.winRateAtEntry}%
                         </span>
                       )}
-                      {format(trade.timestamp, 'HH:mm')}
+                      {safeFormat(trade.timestamp, 'HH:mm')}
                     </span>
                   </div>
                   <div className="space-y-2 text-right" dir="auto">
@@ -7627,7 +7652,7 @@ export default function App() {
                                           وینریت ورود: {t.winRateAtEntry}%
                                         </span>
                                       )}
-                                      {format(t.timestamp, 'HH:mm')}
+                                      {safeFormat(t.timestamp, 'HH:mm')}
                                     </span>
                                   </div>
                                   <div className="space-y-1.5 text-left">

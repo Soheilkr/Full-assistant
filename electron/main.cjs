@@ -2,6 +2,10 @@ const { app, BrowserWindow, ipcMain, desktopCapturer, screen, dialog } = require
 const path = require('path');
 const fs = require('fs');
 
+// Prevent timer throttling in background for alarms and trade monitoring
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+
 let win = null;
 
 function createWindow() {
@@ -13,10 +17,13 @@ function createWindow() {
     useContentSize: true,
     autoHideMenuBar: true,
     frame: true,
+    backgroundColor: '#030712',
+    show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      backgroundThrottling: false
     }
   });
 
@@ -25,6 +32,10 @@ function createWindow() {
   } else {
     win.loadURL('http://localhost:3000');
   }
+
+  win.once('ready-to-show', () => {
+    if (win) win.show();
+  });
 
   win.on('closed', () => {
     win = null;
@@ -43,27 +54,41 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Helper for state file persistence
+// Fast In-Memory State Cache with Debounced Asynchronous Disk Persistence
 const userDataPath = app.getPath('userData');
 const stateFilePath = path.join(userDataPath, 'app_state.json');
 
-function loadStateFile() {
+let memoryState = {};
+
+function loadStateFromDisk() {
   try {
     if (fs.existsSync(stateFilePath)) {
-      return JSON.parse(fs.readFileSync(stateFilePath, 'utf8'));
+      const raw = fs.readFileSync(stateFilePath, 'utf8');
+      return JSON.parse(raw);
     }
   } catch (err) {
-    console.error('Failed to load state file:', err);
+    console.error('[Electron Main] Error loading state from disk:', err);
   }
   return {};
 }
 
-function saveStateFile(data) {
-  try {
-    fs.writeFileSync(stateFilePath, JSON.stringify(data, null, 2), 'utf8');
-  } catch (err) {
-    console.error('Failed to save state file:', err);
-  }
+// Pre-load state into RAM
+memoryState = loadStateFromDisk();
+
+let saveDebounceTimer = null;
+function queueStateSave() {
+  if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+  saveDebounceTimer = setTimeout(() => {
+    saveDebounceTimer = null;
+    try {
+      const dataStr = JSON.stringify(memoryState, null, 2);
+      const tempPath = stateFilePath + '.tmp';
+      fs.writeFileSync(tempPath, dataStr, 'utf8');
+      fs.renameSync(tempPath, stateFilePath);
+    } catch (err) {
+      console.error('[Electron Main] Error saving state to disk:', err);
+    }
+  }, 300); // 300ms debounced async write
 }
 
 // 1. Fold / Unfold & Window Dimensions
@@ -157,11 +182,9 @@ ipcMain.handle('take-screenshot', async (event, { monitorIndex = 0, folderPath =
     const rawImage = targetSource.thumbnail.toPNG();
     const rawBase64 = 'data:image/png;base64,' + rawImage.toString('base64');
 
-    // Extract Date Folder (e.g. "2026-07-25")
     const dateMatch = fileName ? fileName.match(/^(\d{4}-\d{2}-\d{2})/) : null;
     const dateFolder = dateMatch ? dateMatch[1] : new Date().toISOString().split('T')[0];
 
-    // Ensure Daily Subfolder
     let targetFolder = folderPath;
     if (!folderPath.endsWith(dateFolder)) {
       targetFolder = path.join(folderPath, dateFolder);
@@ -171,80 +194,87 @@ ipcMain.handle('take-screenshot', async (event, { monitorIndex = 0, folderPath =
       fs.mkdirSync(targetFolder, { recursive: true });
     }
 
-    // Prepare info text for watermark
     const timeNow = new Date().toLocaleTimeString('en-GB', { hour12: false });
     const strategyName = fileName.includes('btb') ? 'BTB Strategy' : fileName.includes('spike') ? 'Spike Strategy' : 'Channel Strategy';
-    const watermarkInfo = `${strategyName} | ${dateFolder} ${timeNow}`;
+    
+    let positionAction = 'Position Log';
+    if (fileName.includes('entry')) {
+      positionAction = 'Open Position';
+    } else if (fileName.includes('reflection') || fileName.includes('exit')) {
+      positionAction = 'Close Position';
+    } else if (fileName.includes('test')) {
+      positionAction = 'Test';
+    }
 
-    // Apply Watermark via Canvas overlay in renderer
+    const watermarkInfo = `${strategyName} • ${positionAction} | ${dateFolder} ${timeNow}`;
+
     let finalImageBuffer = rawImage;
     if (win && !win.isDestroyed()) {
       try {
-        const script = `
-          (async function() {
-            return new Promise((resolve) => {
-              const img = new Image();
-              img.onload = () => {
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                const ctx = canvas.getContext('2d');
-                
-                ctx.drawImage(img, 0, 0);
+        const watermarkedBase64 = await win.webContents.executeJavaScript(`
+          new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => {
+              const canvas = document.createElement('canvas');
+              canvas.width = img.width;
+              canvas.height = img.height;
+              const ctx = canvas.getContext('2d');
+              
+              ctx.drawImage(img, 0, 0);
 
-                const fontSize = Math.max(20, Math.round(img.height / 36));
-                ctx.font = 'bold ' + fontSize + 'px sans-serif';
-                
-                const titleText = "Soheil Keshtkar | Full Assistant";
-                const infoText = "${watermarkInfo.replace(/"/g, '\\"').replace(/\\/g, '\\\\')}";
-                
-                const m1 = ctx.measureText(titleText);
-                ctx.font = 'normal ' + Math.round(fontSize * 0.8) + 'px sans-serif';
-                const m2 = ctx.measureText(infoText);
-                const maxTextWidth = Math.max(m1.width, m2.width);
-                
-                const paddingX = Math.round(fontSize * 0.9);
-                const paddingY = Math.round(fontSize * 0.7);
-                const bgWidth = maxTextWidth + (paddingX * 2);
-                const bgHeight = (fontSize * 2.1) + (paddingY * 2);
-                
-                const margin = Math.round(fontSize * 0.8);
-                const x = img.width - bgWidth - margin;
-                const y = img.height - bgHeight - margin;
+              // Compact font size scaling
+              const fontSize = Math.max(13, Math.round(img.height / 54));
+              ctx.font = 'bold ' + fontSize + 'px sans-serif';
+              
+              const titleText = "Soheil Keshtkar | Full Assistant";
+              const infoText = ${JSON.stringify(watermarkInfo)};
+              
+              const m1 = ctx.measureText(titleText);
+              ctx.font = 'normal ' + Math.round(fontSize * 0.8) + 'px sans-serif';
+              const m2 = ctx.measureText(infoText);
+              const maxTextWidth = Math.max(m1.width, m2.width);
+              
+              const paddingX = Math.round(fontSize * 0.85);
+              const paddingY = Math.round(fontSize * 0.65);
+              const bgWidth = maxTextWidth + (paddingX * 2);
+              const bgHeight = (fontSize * 2.1) + (paddingY * 2);
+              
+              const margin = Math.round(fontSize * 0.8);
+              const x = img.width - bgWidth - margin;
+              const y = img.height - bgHeight - margin;
 
-                ctx.save();
-                ctx.fillStyle = 'rgba(8, 10, 20, 0.90)';
-                ctx.shadowColor = 'rgba(0, 0, 0, 0.7)';
-                ctx.shadowBlur = 20;
-                ctx.beginPath();
-                if (ctx.roundRect) {
-                  ctx.roundRect(x, y, bgWidth, bgHeight, 12);
-                } else {
-                  ctx.rect(x, y, bgWidth, bgHeight);
-                }
-                ctx.fill();
+              ctx.save();
+              ctx.globalAlpha = 0.5;
+              ctx.fillStyle = 'rgba(8, 10, 20, 0.90)';
+              ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
+              ctx.shadowBlur = 10;
+              ctx.beginPath();
+              if (ctx.roundRect) {
+                ctx.roundRect(x, y, bgWidth, bgHeight, 8);
+              } else {
+                ctx.rect(x, y, bgWidth, bgHeight);
+              }
+              ctx.fill();
 
-                ctx.strokeStyle = '#ef4444';
-                ctx.lineWidth = 2.5;
-                ctx.stroke();
-                ctx.restore();
+              ctx.strokeStyle = '#ef4444';
+              ctx.lineWidth = 1.8;
+              ctx.stroke();
 
-                ctx.fillStyle = '#f8fafc';
-                ctx.font = 'bold ' + fontSize + 'px sans-serif';
-                ctx.fillText(titleText, x + paddingX, y + paddingY + fontSize * 0.8);
+              ctx.fillStyle = '#f8fafc';
+              ctx.font = 'bold ' + fontSize + 'px sans-serif';
+              ctx.fillText(titleText, x + paddingX, y + paddingY + fontSize * 0.8);
 
-                ctx.fillStyle = '#f59e0b';
-                ctx.font = '600 ' + Math.round(fontSize * 0.8) + 'px sans-serif';
-                ctx.fillText(infoText, x + paddingX, y + paddingY + fontSize * 1.9);
+              ctx.fillStyle = '#f59e0b';
+              ctx.font = '600 ' + Math.round(fontSize * 0.8) + 'px sans-serif';
+              ctx.fillText(infoText, x + paddingX, y + paddingY + fontSize * 1.9);
+              ctx.restore();
 
-                resolve(canvas.toDataURL('image/png').split(',')[1]);
-              };
-              img.onerror = () => resolve("");
-              img.src = "${rawBase64}";
-            });
-          })()
-        `;
-        const watermarkedBase64 = await win.webContents.executeJavaScript(script);
+              resolve(canvas.toDataURL('image/png').split(',')[1]);
+            };
+            img.onerror = () => resolve("");
+            img.src = ${JSON.stringify(rawBase64)};
+          });
+        `);
         if (watermarkedBase64) {
           finalImageBuffer = Buffer.from(watermarkedBase64, 'base64');
         }
@@ -262,35 +292,40 @@ ipcMain.handle('take-screenshot', async (event, { monitorIndex = 0, folderPath =
   }
 });
 
-// 8. Synchronous state loading / saving / clearing
+// 8. Synchronous State Operations (0ms Latency via RAM)
 ipcMain.on('load-state-sync', (event, key) => {
-  const store = loadStateFile();
-  event.returnValue = key ? store[key] : store;
+  const val = key ? memoryState[key] : memoryState;
+  event.returnValue = { success: true, data: val !== undefined ? val : null };
 });
 
-ipcMain.on('save-state-sync', (event, { key, val }) => {
-  const store = loadStateFile();
+ipcMain.on('save-state-sync', (event, key, val) => {
   if (key) {
-    store[key] = val;
-  } else if (typeof val === 'object') {
-    Object.assign(store, val);
+    if (val === null || val === undefined) {
+      delete memoryState[key];
+    } else {
+      memoryState[key] = val;
+    }
+  } else if (typeof val === 'object' && val !== null) {
+    Object.assign(memoryState, val);
   }
-  saveStateFile(store);
-  event.returnValue = true;
+  queueStateSave();
+  event.returnValue = { success: true };
 });
 
 ipcMain.on('clear-all-states-sync', (event) => {
-  saveStateFile({});
-  event.returnValue = true;
+  memoryState = {};
+  queueStateSave();
+  event.returnValue = { success: true };
 });
 
-// 9. Large audio handling
-ipcMain.handle('save-large-audio', async (event, { key, buffer }) => {
+// 9. Large Audio Handling
+ipcMain.handle('save-large-audio', async (event, key, data) => {
   try {
     const audioDir = path.join(userDataPath, 'audio_files');
     if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
     const filePath = path.join(audioDir, `${key}.bin`);
-    fs.writeFileSync(filePath, Buffer.from(buffer));
+    const buf = typeof data === 'string' ? Buffer.from(data) : Buffer.from(data);
+    fs.writeFileSync(filePath, buf);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
@@ -302,7 +337,7 @@ ipcMain.handle('load-large-audio', async (event, key) => {
     const filePath = path.join(userDataPath, 'audio_files', `${key}.bin`);
     if (fs.existsSync(filePath)) {
       const buf = fs.readFileSync(filePath);
-      return { success: true, buffer: buf };
+      return { success: true, data: buf };
     }
     return { success: false };
   } catch (err) {

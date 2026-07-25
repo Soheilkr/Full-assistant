@@ -9,8 +9,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateActiveTradeState: (isActive) => ipcRenderer.send('update-active-trade-state', isActive),
   saveExcelFile: (args) => ipcRenderer.invoke('save-excel-file', args),
   loadStateSync: (key) => ipcRenderer.sendSync('load-state-sync', key),
-  saveStateSync: (key, val) => ipcRenderer.sendSync('save-state-sync', { key, val }),
+  saveStateSync: (key, val) => ipcRenderer.sendSync('save-state-sync', key, val),
   clearAllStatesSync: () => ipcRenderer.sendSync('clear-all-states-sync'),
-  saveLargeAudio: (args) => ipcRenderer.invoke('save-large-audio', args),
+  saveLargeAudio: (key, data) => ipcRenderer.invoke('save-large-audio', key, data),
   loadLargeAudio: (key) => ipcRenderer.invoke('load-large-audio', key)
 });

@@ -1,12 +1,32 @@
 {
-  "name": "react-example",
+  "name": "full-assistant",
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:win": "vite build && electron-builder --win",
     "lint": "tsc --noEmit"
+  },
+  "build": {
+    "appId": "com.fullassistant.app",
+    "productName": "Full Assistant",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   },
   "dependencies": {
     "clsx": "^2.1.1",
@@ -21,6 +41,8 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^4.3.1",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
     "typescript": "^5.5.2",
     "vite": "^5.3.1"
   }

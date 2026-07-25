@@ -1,4 +1,4 @@
-name: Build Windows App
+name: Build Windows App (.exe)
 
 on:
   push:
@@ -30,27 +30,12 @@ jobs:
       - name: Install Dependencies
         run: npm install --legacy-peer-deps
 
-      - name: Build Web Assets
-        run: npm run build
-
-      - name: Package Electron App (if electron-builder present)
-        run: |
-          if (Get-Content package.json | Select-String "electron-builder") {
-            npx electron-builder --win
-          } else if (Get-Content package.json | Select-String "electron") {
-            npx electron-builder --win --config.extraMetadata.main=main.js
-          } else {
-            Write-Host "No explicit electron-builder script found in package.json, compiled web assets built successfully in dist/."
-          }
-        shell: powershell
+      - name: Build Web & Package Windows App
+        run: npm run build:win
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-app-build
-          path: |
-            dist
-            dist/*.exe
-            dist/*.zip
-            build
-          if-no-files-found: warn
+          name: Full-Assistant-Windows-Setup
+          path: release/*.exe
+          if-no-files-found: error

@@ -28,7 +28,7 @@ jobs:
           node-version: 20
 
       - name: Install Dependencies
-        run: npm install --force
+        run: npm install
 
       - name: Build Web & Package Windows App
         run: npm run build:win

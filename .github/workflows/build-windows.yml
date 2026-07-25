@@ -1,0 +1,57 @@
+name: Build Windows App
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Windows Executable
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Web Assets
+        run: npm run build
+
+      - name: Package Electron App (if electron-builder present)
+        run: |
+          if (Get-Content package.json | Select-String "electron-builder") {
+            npx electron-builder --win
+          } else if (Get-Content package.json | Select-String "electron") {
+            npx electron-builder --win --config.extraMetadata.main=main.js
+          } else {
+            Write-Host "No explicit electron-builder script found in package.json, compiled web assets built successfully in dist/."
+          }
+        shell: powershell
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-app-build
+          path: |
+            dist
+            dist/*.exe
+            dist/*.zip
+            build
+          if-no-files-found: warn

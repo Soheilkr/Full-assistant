@@ -28,7 +28,10 @@ jobs:
           node-version: 20
 
       - name: Install Dependencies
-        run: npm install --force
+        run: npm install --legacy-peer-deps
+
+      - name: Ensure Rollup Windows Native Binary
+        run: npm install --no-save @rollup/rollup-win32-x64-msvc
 
       - name: Build Web & Package Windows App
         run: npm run build:win

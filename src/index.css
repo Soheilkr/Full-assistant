@@ -1,140 +1,572 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Vazirmatn:wght@300;400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
-@theme {
-  --font-sans: "Vazirmatn", "Inter", ui-sans-serif, system-ui, sans-serif;
+
+/* --- BTB Warm Beige Theme Overrides --- */
+
+/* Root Level text and bg overrides */
+.mode-btb {
+  background-color: #C5C2B9 !important;
+  color: #1A1A18 !important;
 }
 
-@layer base {
-  html, body {
-    overscroll-behavior-y: none;
-    overscroll-behavior-x: none;
-    overscroll-behavior: none;
-    overflow: hidden !important;
-  }
-  body {
-    @apply font-sans antialiased bg-slate-950 text-slate-100;
-    -webkit-tap-highlight-color: transparent;
-  }
+/* Page background */
+div.mode-btb.min-h-screen {
+  background-color: #C5C2B9 !important;
+  background-image: radial-gradient(ellipse at top, #B8B5AB, #C5C2B9, #C5C2B9) !important;
+  color: #1A1A18 !important;
 }
 
-/* Custom glow & blink animations for different winrate phases */
-
-@keyframes blink-blue {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-@keyframes blink-green {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-@keyframes blink-orange {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
-}
-@keyframes blink-red {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-@keyframes blink-purple {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.6; }
+/* Card / Dialog / Overlay Container */
+.mode-btb .rounded-\[30px\] ,
+.mode-btb .rounded-\[40px\] ,
+.mode-btb .rounded-3xl {
+  background-color: #C8C5BB !important;
+  border-color: #A8A59B !important;
+  color: #1A1A18 !important;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08) !important;
 }
 
-@keyframes glow-card-blue {
-  0%, 100% { border-color: rgba(59, 130, 246, 0.45); }
-  50% { border-color: rgba(59, 130, 246, 0.15); }
-}
-@keyframes glow-card-green {
-  0%, 100% { border-color: rgba(16, 185, 129, 0.45); }
-  50% { border-color: rgba(16, 185, 129, 0.15); }
-}
-@keyframes glow-card-orange {
-  0%, 100% { border-color: rgba(245, 158, 11, 0.45); }
-  50% { border-color: rgba(245, 158, 11, 0.15); }
-}
-@keyframes glow-card-red {
-  0%, 100% { border-color: rgba(239, 68, 68, 0.5); }
-  50% { border-color: rgba(239, 68, 68, 0.15); }
-}
-@keyframes glow-card-purple {
-  0%, 100% { border-color: rgba(168, 85, 247, 0.45); }
-  50% { border-color: rgba(168, 85, 247, 0.15); }
+/* Headers / Panels */
+.mode-btb .bg-slate-950\/65,
+.mode-btb .bg-slate-950\/80,
+.mode-btb .bg-slate-950\/90,
+.mode-btb .bg-slate-950,
+.mode-btb .bg-slate-900\/65 {
+  background-color: #BFBCB3 !important;
+  border-color: #A19E93 !important;
+  color: #1A1A18 !important;
 }
 
-.animate-blink-blue { animation: blink-blue 2s infinite ease-in-out; }
-.animate-blink-green { animation: blink-green 2s infinite ease-in-out; }
-.animate-blink-orange { animation: blink-orange 2s infinite ease-in-out; }
-.animate-blink-red { animation: blink-red 1.5s infinite ease-in-out; }
-.animate-blink-purple { animation: blink-purple 2s infinite ease-in-out; }
-
-.animate-glow-blue { animation: glow-card-blue 3s infinite ease-in-out; }
-.animate-glow-green { animation: glow-card-green 3s infinite ease-in-out; }
-.animate-glow-orange { animation: glow-card-orange 3s infinite ease-in-out; }
-.animate-glow-red { animation: glow-card-red 2s infinite ease-in-out; }
-.animate-glow-purple { animation: glow-card-purple 3s infinite ease-in-out; }
-
-/* Channel Strategy Mode Theme - Forest/Emerald Dark */
-.theme-channel {
-  --color-slate-950: #050907;
-  --color-slate-900: #0b120f;
-  --color-slate-800: #16241e;
-  --color-slate-700: #22362c;
+/* List Items / Sub-Containers / Inset Panels */
+.mode-btb .bg-slate-950\/40,
+.mode-btb .bg-slate-950\/30,
+.mode-btb .bg-slate-950\/50,
+.mode-btb .bg-slate-950\/60,
+.mode-btb .bg-slate-950\/20,
+.mode-btb .bg-slate-900\/40,
+.mode-btb .bg-slate-950\/45,
+.mode-btb .bg-slate-900,
+.mode-btb .bg-indigo-950\/40 {
+  background-color: #B8B5AA !important;
+  border-color: #A8A59B !important;
+  color: #1A1A18 !important;
 }
 
-/* BTB Strategy Mode Theme - Indigo Override + Warm Low-Glare Mid-Tone Theme Switch */
-.theme-btb {
-  --color-slate-950: #9e9a93; /* Cozy warm mid-tone gray-brown/cement background */
-  --color-slate-900: #beb9b0; /* Soft warm sandstone card background */
-  --color-slate-800: #8a867f; /* Warm earth borders */
-  --color-slate-700: #736f68; /* Warm accents */
-  --color-slate-600: #5c5953; /* Medium warm elements */
-  --color-slate-500: #45433e; /* Muted text */
-  --color-slate-400: #2e2d2a; /* Secondary readable text */
-  --color-slate-300: #1c1b19; /* Standard dark text */
-  --color-slate-200: #0f0e0d; /* Primary prominent text */
-  --color-slate-100: #050504; /* High-contrast charcoal text */
-  --color-slate-5: #000000;
-  --color-slate-50: #050504;
-
-  /* Harmonize Indigo colors for the warm sandstone/cement theme */
-  --color-indigo-50: #eaeefc;
-  --color-indigo-100: #d5defb;
-  --color-indigo-200: #c2ceff;
-  --color-indigo-300: #2e2380; /* Darker navy-indigo */
-  --color-indigo-400: #1c145a; /* Rich royal indigo text (high contrast) */
-  --color-indigo-500: #31259c;
-  --color-indigo-650: #31259c;
-  --color-indigo-600: #3c2fbf;
-  --color-indigo-700: #2c2194;
-  --color-indigo-800: #1d156b;
-  --color-indigo-900: #dbe0fc; /* Light lavender-blue backdrop */
-  --color-indigo-950: #ebedfc; /* Warm light-lavender backdrop tint */
-
-  /* Map Emerald/Wins to rich forest green so they are very visible on light theme */
-  --color-emerald-50: #e6f7f0;
-  --color-emerald-100: #c2eedc;
-  --color-emerald-200: #9ae2c6;
-  --color-emerald-300: #064e3b; /* Dark forest green text */
-  --color-emerald-400: #044b36; /* Dark green */
-  --color-emerald-500: #065f46;
-  --color-emerald-600: #047857;
-  --color-emerald-700: #065f46;
-  --color-emerald-800: #064e3b;
-  --color-emerald-900: #d1fae5; /* Soft light-green backdrop tint */
-  --color-emerald-950: #e6fbf1; /* Soft green backdrop */
+/* Inner Text Elements & Typography */
+.mode-btb .text-slate-100,
+.mode-btb .text-slate-200,
+.mode-btb .text-slate-300,
+.mode-btb .text-slate-400,
+.mode-btb .text-slate-500,
+.mode-btb .text-slate-600,
+.mode-btb .text-slate-450 {
+  color: #1A1A18 !important;
 }
 
-/* Redirect animations to purple/indigo in BTB Mode */
-.theme-btb .animate-glow-green {
-  animation: glow-card-purple 3s infinite ease-in-out !important;
-}
-.theme-btb .animate-blink-green {
-  animation: blink-purple 2s infinite ease-in-out !important;
-}
-
-/* Rewrite custom drop shadows to use indigo instead of green in BTB mode */
-.theme-btb .shadow-\[0_0_20px_rgba\(16\2c 185\2c 129\2c 0\.5\)\] {
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.5) !important;
+/* Second-level / Muted Texts */
+.mode-btb .text-slate-400,
+.mode-btb .text-slate-500,
+.mode-btb .text-slate-600 {
+  color: #5C5A52 !important;
 }
 
+/* Borders */
+.mode-btb .border-slate-800,
+.mode-btb .border-slate-800\/80,
+.mode-btb .border-slate-800\/60,
+.mode-btb .border-slate-800\/65,
+.mode-btb .border-slate-900\/60,
+.mode-btb .border-slate-900,
+.mode-btb .border-slate-700,
+.mode-btb .border-slate-700\/60 {
+  border-color: #A8A59B !important;
+}
+
+/* Specific Buttons, Pills and Switches */
+.mode-btb .bg-slate-900,
+.mode-btb .bg-indigo-950\/40,
+.mode-btb button.border-slate-800,
+.mode-btb button.border-indigo-500\/20 {
+  background-color: #C0BDB3 !important;
+  border-color: #AEA99E !important;
+  color: #1A1A18 !important;
+}
+
+/* Track / Inset outer background */
+.mode-btb .p-1\.5.rounded-2xl.border,
+.mode-btb .bg-slate-950\/35 {
+  background-color: #B8B5AA !important;
+  border-color: #AEA99E !important;
+}
+
+/* Active Segment in Toggle Switches */
+.mode-btb .bg-slate-900.border-slate-700,
+.mode-btb .bg-indigo-600 {
+  background-color: #C9C6BC !important;
+  border-color: #A19E93 !important;
+  color: #1A1A18 !important;
+}
+
+/* Status indicators and dynamic buttons */
+.mode-btb .text-indigo-400 {
+  color: #3B28CC !important;
+}
+
+.mode-btb .text-indigo-300 {
+  color: #2D1BA4 !important;
+}
+
+.mode-btb .text-emerald-400,
+.mode-btb .text-green-400 {
+  color: #166534 !important;
+}
+
+.mode-btb .text-red-400,
+.mode-btb .text-red-500 {
+  color: #991B1B !important;
+}
+
+/* Dropdown/Input/Mental Reflection TextArea elements */
+.mode-btb textarea,
+.mode-btb input,
+.mode-btb select {
+  background-color: #C9C6BC !important;
+  border-color: #A19E93 !important;
+  color: #1A1A18 !important;
+}
+
+/* Soft shadows for cards */
+.mode-btb .shadow-2xl,
+.mode-btb .shadow-lg {
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.06), 0 8px 10px -6px rgba(0,0,0,0.06) !important;
+}
+
+/* ==========================================================================
+   ELITE TRADING SUITE - SENSORY DESIGN SYSTEM & HARMONY OVERRIDES
+   Custom Crafted for Soheil Keshtkar - Elite Quantitative Desk
+   ========================================================================== */
+
+/* Cohesive Shared Styles & Typography Reset */
+.mode-channel, .mode-btb, .mode-spike {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Perfect mathematically aligned border radius */
+.mode-channel .rounded-\[30px\], .mode-spike .rounded-\[30px\], .mode-btb .rounded-\[30px\],
+.mode-channel .rounded-\[40px\], .mode-spike .rounded-\[40px\], .mode-btb .rounded-\[40px\] {
+  border-radius: 28px !important;
+}
+
+/* High-contrast premium scrollbars */
+.mode-channel ::-webkit-scrollbar, .mode-spike ::-webkit-scrollbar, .mode-btb ::-webkit-scrollbar {
+  width: 6px !important;
+  height: 6px !important;
+}
+.mode-channel ::-webkit-scrollbar-thumb {
+  background: rgba(16, 185, 129, 0.2) !important;
+  border-radius: 99px !important;
+}
+.mode-spike ::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.2) !important;
+  border-radius: 99px !important;
+}
+.mode-btb ::-webkit-scrollbar-thumb {
+  background: rgba(59, 40, 204, 0.15) !important;
+  border-radius: 99px !important;
+}
+
+/* Input Focus Glows */
+.mode-channel input:focus, .mode-channel textarea:focus, .mode-channel select:focus {
+  outline: none !important;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.12) !important;
+}
+.mode-spike input:focus, .mode-spike textarea:focus, .mode-spike select:focus {
+  outline: none !important;
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12) !important;
+}
+.mode-btb input:focus, .mode-btb textarea:focus, .mode-btb select:focus {
+  outline: none !important;
+  border-color: #3b28cc !important;
+  box-shadow: 0 0 0 4px rgba(59, 40, 204, 0.08) !important;
+}
+
+
+/* --------------------------------------------------------------------------
+   THEME 1: CHANNEL MODE (OBSIDIAN EMERALD - "ELITE ASSET" PRIVATE DESK)
+   -------------------------------------------------------------------------- */
+.mode-channel {
+  background-color: #020403 !important;
+}
+
+/* Master Card Container */
+.mode-channel .rounded-\[30px\],
+.mode-channel .rounded-\[40px\],
+.mode-channel [class*="rounded-\["] {
+  background-color: #080f0c !important;
+  border: 1px solid #11281b !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9), 
+              0 0 40px rgba(16, 185, 129, 0.03) !important;
+}
+
+/* Top Navigation / Title Header Bar */
+.mode-channel .bg-slate-950\/65,
+.mode-channel .backdrop-blur-md,
+.mode-channel [class*="bg-slate-950"] {
+  background-color: rgba(4, 8, 6, 0.8) !important;
+  border-bottom: 1px solid #11281b !important;
+}
+
+/* Inset Panels, Active Logs & Lists */
+.mode-channel .bg-slate-950\/40,
+.mode-channel .bg-slate-950\/30,
+.mode-channel .bg-slate-950\/50,
+.mode-channel .bg-slate-950\/60,
+.mode-channel .bg-slate-950\/20,
+.mode-channel .bg-slate-900\/40,
+.mode-channel .bg-slate-950\/45,
+.mode-channel .bg-slate-900,
+.mode-channel .bg-indigo-950\/40,
+.mode-channel .bg-slate-950\/50,
+.mode-channel [class*="bg-slate-"] {
+  background-color: #050a07 !important;
+  border-color: #11281b !important;
+}
+
+/* Main Text & Accents */
+.mode-channel .text-slate-100,
+.mode-channel .text-slate-200,
+.mode-channel .text-slate-300,
+.mode-channel .text-white,
+.mode-channel h1,
+.mode-channel h2,
+.mode-channel h3 {
+  color: #f1f5f9 !important;
+}
+
+.mode-channel .text-slate-400,
+.mode-channel .text-slate-500,
+.mode-channel .text-slate-600,
+.mode-channel [class*="text-slate-"] {
+  color: #799a86 !important;
+}
+
+/* Specific borders */
+.mode-channel .border-slate-800,
+.mode-channel .border-slate-800\/80,
+.mode-channel .border-slate-800\/60,
+.mode-channel .border-slate-700,
+.mode-channel .border-slate-700\/60,
+.mode-channel .border-slate-900\/60,
+.mode-channel [class*="border-slate-"] {
+  border-color: #11281b !important;
+}
+
+/* Emerald Accent Highlights (Luxury Gold-Green pairings) */
+.mode-channel .text-emerald-400,
+.mode-channel .text-emerald-500 {
+  color: #10b981 !important;
+  text-shadow: 0 0 8px rgba(16, 185, 129, 0.25) !important;
+}
+
+.mode-channel .text-indigo-400,
+.mode-channel .text-indigo-300,
+.mode-channel .text-indigo-500,
+.mode-channel .text-amber-400,
+.mode-channel .text-amber-500,
+.mode-channel .text-yellow-400 {
+  color: #d4af37 !important; /* Premium Gold Details */
+}
+
+/* Input boxes */
+.mode-channel textarea,
+.mode-channel input,
+.mode-channel select {
+  background-color: #050a07 !important;
+  border: 1px solid #163121 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Segmented Control Track */
+.mode-channel .p-1\.5.rounded-2xl.border,
+.mode-channel .bg-slate-950\/35 {
+  background-color: #050907 !important;
+  border-color: #11281b !important;
+}
+
+/* Dynamic State Buttons */
+.mode-channel button {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.mode-channel button:hover {
+  filter: brightness(1.1) !important;
+}
+
+/* --------------------------------------------------------------------------
+   THEME 2: BTB MODE (HERITAGE EDITORIAL - SWISS WATCHMAKER CATALOG STYLE)
+   -------------------------------------------------------------------------- */
+.mode-btb {
+  background-color: #dcd8cf !important;
+  color: #1a1916 !important;
+}
+
+/* Master Card Container */
+.mode-btb .rounded-\[30px\],
+.mode-btb .rounded-\[40px\],
+.mode-btb [class*="rounded-\["] {
+  background-color: #f6f4ee !important;
+  border: 1px solid #c5c1b5 !important;
+  box-shadow: 0 25px 50px -12px rgba(28, 25, 23, 0.12), 
+              0 0 30px rgba(197, 193, 181, 0.2) !important;
+}
+
+/* Top Navigation / Title Header Bar */
+.mode-btb .bg-slate-950\/65,
+.mode-btb .backdrop-blur-md,
+.mode-btb [class*="bg-slate-950"] {
+  background-color: #eae7de !important;
+  border-bottom: 1px solid #c5c1b5 !important;
+}
+
+/* Inset Panels, Active Logs & Lists - Transformed to light elegant stone panels */
+.mode-btb .bg-slate-950\/40,
+.mode-btb .bg-slate-950\/30,
+.mode-btb .bg-slate-950\/50,
+.mode-btb .bg-slate-950\/60,
+.mode-btb .bg-slate-950\/20,
+.mode-btb .bg-slate-900\/40,
+.mode-btb .bg-slate-950\/45,
+.mode-btb .bg-slate-900,
+.mode-btb .bg-indigo-950\/40,
+.mode-btb .bg-slate-950\/50,
+.mode-btb .bg-slate-950,
+.mode-btb .bg-slate-900,
+.mode-btb .bg-slate-800,
+.mode-btb [class*="bg-slate-"] {
+  background-color: #ebe7dd !important;
+  border-color: #cbc6ba !important;
+}
+
+/* Typography Overrides for Premium Editorial Feel - high contrast rich charcoal */
+.mode-btb .text-slate-100,
+.mode-btb .text-slate-200,
+.mode-btb .text-slate-300,
+.mode-btb .text-white,
+.mode-btb h1,
+.mode-btb h2,
+.mode-btb h3,
+.mode-btb label,
+.mode-btb span {
+  color: #1a1916 !important;
+}
+
+/* Subtitles and secondary descriptors - readable warm charcoal-gray */
+.mode-btb .text-slate-400,
+.mode-btb .text-slate-500,
+.mode-btb .text-slate-600,
+.mode-btb .text-slate-450,
+.mode-btb [class*="text-slate-"] {
+  color: #635f56 !important;
+}
+
+/* Ensure white text is retained inside primary colored action buttons */
+.mode-btb .bg-indigo-600 .text-white,
+.mode-btb .bg-indigo-600 span,
+.mode-btb .bg-red-600 .text-white,
+.mode-btb .bg-red-600 span,
+.mode-btb .bg-emerald-600 .text-white,
+.mode-btb .bg-emerald-600 span,
+.mode-btb .bg-rose-600 .text-white,
+.mode-btb .bg-rose-600 span,
+.mode-btb .bg-emerald-950\/60 .text-emerald-400,
+.mode-btb .bg-rose-950\/60 .text-rose-400,
+.mode-btb .bg-red-950\/40 .text-red-500 {
+  color: revert !important;
+}
+
+/* Specific borders - elegant warm gray divider lines */
+.mode-btb .border-slate-800,
+.mode-btb .border-slate-800\/80,
+.mode-btb .border-slate-800\/60,
+.mode-btb .border-slate-700,
+.mode-btb .border-slate-700\/60,
+.mode-btb .border-slate-900\/60,
+.mode-btb [class*="border-slate-"] {
+  border-color: #c5c1b5 !important;
+}
+
+/* High-contrast colors for alerts and highlights in BTB light mode */
+.mode-btb .text-indigo-400,
+.mode-btb .text-indigo-300,
+.mode-btb .text-indigo-500 {
+  color: #271ca7 !important;
+}
+
+.mode-btb .text-emerald-400,
+.mode-btb .text-green-400,
+.mode-btb .text-green-500 {
+  color: #156534 !important;
+}
+
+.mode-btb .text-red-400,
+.mode-btb .text-red-500,
+.mode-btb .text-rose-400,
+.mode-btb .text-rose-500 {
+  color: #a81c1c !important;
+}
+
+.mode-btb .text-amber-400,
+.mode-btb .text-amber-500,
+.mode-btb .text-yellow-400 {
+  color: #b25e00 !important;
+}
+
+/* Input, textareas, drop-downs */
+.mode-btb textarea,
+.mode-btb input,
+.mode-btb select {
+  background-color: #f9f8f6 !important;
+  border: 1px solid #c5c1b5 !important;
+  color: #1a1916 !important;
+}
+
+/* Segmented Control Track */
+.mode-btb .p-1\.5.rounded-2xl.border,
+.mode-btb .bg-slate-950\/35 {
+  background-color: #e5e1d7 !important;
+  border-color: #c5c1b5 !important;
+}
+
+/* Dynamic State Buttons (Warm sand/stone backgrounds) */
+.mode-btb button.border-slate-800,
+.mode-btb button.border-indigo-500\/20 {
+  background-color: #e2dec5 !important;
+  border-color: #bfbaa6 !important;
+  color: #1a1a18 !important;
+}
+
+/* Premium Scrollbar design for BTB light mode */
+.mode-btb ::-webkit-scrollbar-thumb {
+  background: rgba(120, 115, 100, 0.3) !important;
+  border-radius: 99px !important;
+}
+
+.mode-btb ::-webkit-scrollbar-track {
+  background: rgba(246, 244, 238, 0.5) !important;
+}
+
+/* --------------------------------------------------------------------------
+   THEME 3: SPIKE MODE (STRATEGIC IRON & STEEL - COLD TITANIUM DESK)
+   -------------------------------------------------------------------------- */
+.mode-spike {
+  background-color: #06090f !important;
+}
+
+/* Master Card Container */
+.mode-spike .rounded-\[30px\],
+.mode-spike .rounded-\[40px\],
+.mode-spike [class*="rounded-\["] {
+  background-color: #0e131f !important;
+  border: 1px solid #1d263b !important;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.85), 
+              0 0 35px rgba(99, 102, 241, 0.04) !important;
+}
+
+/* Top Navigation / Title Header Bar */
+.mode-spike .bg-slate-950\/65,
+.mode-spike .backdrop-blur-md,
+.mode-spike [class*="bg-slate-950"] {
+  background-color: rgba(9, 12, 21, 0.85) !important;
+  border-bottom: 1px solid #1d263b !important;
+}
+
+/* Inset Panels, Active Logs & Lists */
+.mode-spike .bg-slate-950\/40,
+.mode-spike .bg-slate-950\/30,
+.mode-spike .bg-slate-950\/50,
+.mode-spike .bg-slate-950\/60,
+.mode-spike .bg-slate-950\/20,
+.mode-spike .bg-slate-900\/40,
+.mode-spike .bg-slate-950\/45,
+.mode-spike .bg-slate-900,
+.mode-spike .bg-indigo-950\/40,
+.mode-spike .bg-slate-950\/50,
+.mode-spike [class*="bg-slate-"] {
+  background-color: #080c14 !important;
+  border-color: #1d263b !important;
+}
+
+/* Typography Elements */
+.mode-spike .text-slate-100,
+.mode-spike .text-slate-200,
+.mode-spike .text-slate-300,
+.mode-spike .text-white,
+.mode-spike h1,
+.mode-spike h2,
+.mode-spike h3 {
+  color: #f1f5f9 !important;
+}
+
+.mode-spike .text-slate-400,
+.mode-spike .text-slate-500,
+.mode-spike .text-slate-600,
+.mode-spike [class*="text-slate-"] {
+  color: #6d7b93 !important;
+}
+
+/* Specific borders */
+.mode-spike .border-slate-800,
+.mode-spike .border-slate-800\/80,
+.mode-spike .border-slate-800\/60,
+.mode-spike .border-slate-700,
+.mode-spike .border-slate-700\/60,
+.mode-spike .border-slate-900\/60,
+.mode-spike [class*="border-slate-"] {
+  border-color: #1d263b !important;
+}
+
+/* High-Contrast Electric Cobalt & Platinum accents */
+.mode-spike .text-indigo-400,
+.mode-spike .text-indigo-300,
+.mode-spike .text-indigo-500 {
+  color: #818cf8 !important;
+  text-shadow: 0 0 10px rgba(99, 102, 241, 0.3) !important;
+}
+
+.mode-spike .text-emerald-400,
+.mode-spike .text-green-400 {
+  color: #10b981 !important;
+}
+
+.mode-spike .text-red-400,
+.mode-spike .text-red-500,
+.mode-spike .text-rose-400,
+.mode-spike .text-rose-500 {
+  color: #f87171 !important;
+}
+
+/* Input fields */
+.mode-spike textarea,
+.mode-spike input,
+.mode-spike select {
+  background-color: #080c14 !important;
+  border: 1px solid #232e48 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Segmented Control Track */
+.mode-spike .p-1\.5.rounded-2xl.border,
+.mode-spike .bg-slate-950\/35 {
+  background-color: #080c14 !important;
+  border-color: #1d263b !important;
+}
+
+/* Active Segment in Spike Toggle */
+.mode-spike .bg-slate-900.border-slate-700,
+.mode-spike .bg-indigo-600 {
+  background-color: #1d263b !important;
+  border-color: #313f5e !important;
+}

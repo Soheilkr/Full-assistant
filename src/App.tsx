@@ -23,17 +23,39 @@ import {
   Camera,
   Download,
   FileText,
-  Upload
+  Upload,
+  Database,
+  Trash2,
+  FileSpreadsheet,
+  Zap,
+  TrendingUp,
+  Crosshair
 } from 'lucide-react';
 
+export interface TradeRecord {
+  id: string;
+  date: string;
+  time: string;
+  tradingMode: string;
+  strategyName: string;
+  tradeTitle: string;
+  tradeSymbol: string;
+  tradeDirection: 'LONG' | 'SHORT';
+  entryPrice: string;
+  exitPrice: string;
+  tradePnL: string;
+  watermarkTag: string;
+  postText: string;
+}
+
 export default function App() {
-  // Screen States
+  // Screen & View States
   const [monitor2Active, setMonitor2Active] = useState<boolean>(true);
   const [brightness, setBrightness] = useState<number>(85);
   const [localPort, setLocalPort] = useState<string>('5000');
   const [connectionStatus, setConnectionStatus] = useState<'simulated' | 'connected' | 'error'>('simulated');
   const [copiedText, setCopiedText] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'desk' | 'trade_screenshot'>('trade_screenshot');
+  const [activeTab, setActiveTab] = useState<'trade_screenshot' | 'archive' | 'desk'>('trade_screenshot');
   
   // Timer States
   const [timerActive, setTimerActive] = useState<boolean>(false);
@@ -47,22 +69,60 @@ export default function App() {
   const [isShift, setIsShift] = useState<boolean>(false);
 
   // Trade Close Screenshot & Watermark Generator States
+  const [tradingMode, setTradingMode] = useState<string>('مد اسپایک (Spike Mode)');
+  const [strategyName, setStrategyName] = useState<string>('استراتژی شکست و اسپایک (Spike & Breakout)');
   const [tradeTitle, setTradeTitle] = useState<string>('معامله اسکالپ بیت‌کوین (BTC/USDT)');
   const [tradeSymbol, setTradeSymbol] = useState<string>('BTC/USDT');
   const [tradeDirection, setTradeDirection] = useState<'LONG' | 'SHORT'>('LONG');
   const [entryPrice, setEntryPrice] = useState<string>('64,250');
   const [exitPrice, setExitPrice] = useState<string>('65,800');
   const [tradePnL, setTradePnL] = useState<string>('+$1,550 (+2.41%)');
-  const [postText, setPostText] = useState<string>('معامله بر اساس شکست مقاومت ۱۵ دقیقه باز شد. مدیریت ریسک رعایت شد و پس از برخورد به تارگت اول کلوز گردید.');
+  const [postText, setPostText] = useState<string>('معامله در مد اسپایک بر اساس شکست مقاومت ۱۵ دقیقه باز شد. پوزیشن پس از برخورد به تارگت کامل کلوز گردید.');
   const [watermarkTag, setWatermarkTag] = useState<string>('@Soheil_Keshtkar');
   const [customChartImage, setCustomChartImage] = useState<string | null>(null);
   const [isGeneratingCanvas, setIsGeneratingCanvas] = useState<boolean>(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Command Logs
+  // Trade Archive State (Stored in LocalStorage)
+  const [tradeArchive, setTradeArchive] = useState<TradeRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('soheil_trading_archive');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {
+      console.error('Error loading trade archive:', e);
+    }
+    return [
+      {
+        id: '1',
+        date: new Date().toLocaleDateString('fa-IR'),
+        time: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+        tradingMode: 'مد اسپایک (Spike Mode)',
+        strategyName: 'اسپایک مومنتوم و شکست (Spike Breakout)',
+        tradeTitle: 'کلوز معامله اسپایک بیت‌کوین',
+        tradeSymbol: 'BTC/USDT',
+        tradeDirection: 'LONG',
+        entryPrice: '64,250',
+        exitPrice: '65,800',
+        tradePnL: '+$1,550 (+2.41%)',
+        watermarkTag: '@Soheil_Keshtkar',
+        postText: 'معامله در مد اسپایک بر اساس شکست مقاومت ۱۵ دقیقه باز شد. پوزیشن پس از برخورد به تارگت کامل کلوز گردید.'
+      }
+    ];
+  });
+
+  // Command Logs State
   const [logs, setLogs] = useState<Array<{ id: string; time: string; action: string; status: 'success' | 'info' | 'error' }>>([
-    { id: '1', time: new Date().toLocaleTimeString(), action: 'سیستم آماده به کار (صفحه کلید مجازی و شبیه‌ساز مانیتور ۲)', status: 'info' }
+    { id: '1', time: new Date().toLocaleTimeString('fa-IR'), action: 'سیستم آماده به کار (کنترل مانیتور ۲، واتر‌مارک و آرشیو اکسل اسپایک)', status: 'info' }
   ]);
+
+  // Sync Trade Archive to LocalStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('soheil_trading_archive', JSON.stringify(tradeArchive));
+    } catch (e) {
+      console.error('Error saving trade archive:', e);
+    }
+  }, [tradeArchive]);
 
   // Handle countdown timer
   useEffect(() => {
@@ -88,7 +148,7 @@ export default function App() {
     setLogs((prev) => [
       {
         id: Math.random().toString(),
-        time: new Date().toLocaleTimeString(),
+        time: new Date().toLocaleTimeString('fa-IR'),
         action,
         status
       },
@@ -96,7 +156,7 @@ export default function App() {
     ]);
   };
 
-  // Function to copy code or typed text to clipboard
+  // Copy code or text
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopiedText(label);
@@ -120,85 +180,44 @@ export default function App() {
         setConnectionStatus('connected');
         addLog(`ارسال فرمان ${actionName} به مانیتور ۲ با موفقیت انجام شد`, 'success');
       } else {
-        throw new Error('Local server returned error');
+        throw new Error('Local server error');
       }
     } catch (err) {
       setConnectionStatus('simulated');
-      addLog(`فرمان ${actionName} در مانیتور ۲ اعمال شد (شبیه‌سازی مرورگر)`, 'info');
+      addLog(`فرمان ${actionName} در مانیتور ۲ اعمال شد (شبیه‌ساز مرورگر)`, 'info');
     }
   };
 
-  // Send typed text to desktop server
-  const sendKeyboardTextToDesktop = async (textToSend: string) => {
-    if (!textToSend.trim()) return;
-    addLog(`ارسال متن کیبورد به دسکتاپ: "${textToSend}"`, 'info');
+  // Test Connection
+  const testLocalConnection = async () => {
+    addLog('در حال بررسی اتصال به سرور محلی دسکتاپ...', 'info');
     try {
-      const response = await fetch(`http://localhost:${localPort}/type`, {
-        method: 'POST',
-        mode: 'cors',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ text: textToSend })
-      });
-      if (response.ok) {
-        addLog('متن با موفقیت روی ویندوز تایپ شد', 'success');
+      const res = await fetch(`http://localhost:${localPort}/`, { method: 'GET', mode: 'cors' });
+      if (res.ok) {
+        setConnectionStatus('connected');
+        addLog('اتصال به سرور محلی دسکتاپ برقرار است', 'success');
       } else {
-        addLog('متن در محیط شبیه‌ساز کپی شد', 'info');
+        setConnectionStatus('error');
+        addLog('سرور محلی پورت ' + localPort + ' پاسخ نداد', 'error');
       }
-    } catch (err) {
-      addLog('سرور محلی پاسخ نداد. متن در کادرمتن قرار گرفت (آماده کپی)', 'info');
+    } catch (e) {
+      setConnectionStatus('simulated');
+      addLog('سرور محلی یافت نشد. سیستم در حالت شبیه‌ساز مرورگر فعال است', 'info');
     }
   };
 
-  // Send shortcut to desktop
-  const sendShortcut = async (shortcutKey: string, label: string) => {
-    addLog(`اجرای کلید میانبر: ${label}`, 'info');
-    if (shortcutKey === 'WIN_P') {
-      toggleMonitor2();
-      return;
-    }
-    try {
-      await fetch(`http://localhost:${localPort}/shortcut?key=${shortcutKey}`, {
-        method: 'POST',
-        mode: 'cors'
-      });
-    } catch (err) {
-      // simulated
-    }
-  };
-
+  // Toggle Monitor 2
   const toggleMonitor2 = () => {
     const newState = !monitor2Active;
     setMonitor2Active(newState);
     triggerLocalCommand(newState);
   };
 
-  // Test local connection manually
-  const testLocalConnection = async () => {
-    addLog('در حال تست اتصال به سرور محلی دسکتاپ...', 'info');
-    try {
-      const response = await fetch(`http://localhost:${localPort}/status`, {
-        method: 'GET',
-        mode: 'cors'
-      });
-      if (response.ok) {
-        setConnectionStatus('connected');
-        addLog('اتصال موفقیت‌آمیز به سرویس دسکتاپ برقرار شد!', 'success');
-      } else {
-        setConnectionStatus('error');
-        addLog('سرویس محلی پاسخ نامعتبر داد.', 'error');
-      }
-    } catch (err) {
-      setConnectionStatus('simulated');
-      addLog('سرور محلی یافت نشد. استفاده از حالت شبیه‌ساز مرورگر.', 'info');
-    }
-  };
-
-  // Start / Cancel Sleep Timer
+  // Start Auto Sleep Timer
   const startTimer = () => {
     if (timerActive) {
       setTimerActive(false);
+      setTimeLeft(0);
       addLog('تایمر خاموشی خودکار لغو شد', 'info');
     } else {
       setTimeLeft(timerDuration);
@@ -208,16 +227,104 @@ export default function App() {
     }
   };
 
-  // Image Upload Handler for Chart
+  // Image Upload for Chart
   const handleChartImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        setCustomChartImage(event.target?.result as string);
-        addLog('تصویر سفارشی چارت معامله بارگذاری شد', 'success');
+        if (event.target?.result) {
+          setCustomChartImage(event.target.result as string);
+          addLog('تصویر جدید چارت معامله بارگذاری شد', 'success');
+        }
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // SAVE CURRENT TRADE TO ARCHIVE & EXCEL
+  const saveTradeToArchive = () => {
+    const newRecord: TradeRecord = {
+      id: Date.now().toString(),
+      date: new Date().toLocaleDateString('fa-IR'),
+      time: new Date().toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }),
+      tradingMode: tradingMode,
+      strategyName: strategyName,
+      tradeTitle: tradeTitle,
+      tradeSymbol: tradeSymbol,
+      tradeDirection: tradeDirection,
+      entryPrice: entryPrice,
+      exitPrice: exitPrice,
+      tradePnL: tradePnL,
+      watermarkTag: watermarkTag,
+      postText: postText
+    };
+
+    setTradeArchive((prev) => [newRecord, ...prev]);
+    addLog(`معامله در حالت "${tradingMode}" با متن پست ترید به آرشیو و اکسل اضافه شد!`, 'success');
+  };
+
+  // EXPORT ARCHIVE TO EXCEL (CSV with UTF-8 BOM)
+  const exportArchiveToExcel = () => {
+    if (tradeArchive.length === 0) {
+      addLog('هیچ معامله‌ای در آرشیو جهت خروجی اکسل وجود ندارد', 'error');
+      return;
+    }
+
+    const headers = [
+      'تاریخ',
+      'زمان',
+      'حالت معامله',
+      'نام استراتژی',
+      'عنوان معامله',
+      'نماد',
+      'پوزیشن',
+      'قیمت ورود',
+      'قیمت خروج',
+      'سود / زیان',
+      'تگ واترمارک',
+      'یادداشت و تحلیل پست ترید'
+    ];
+
+    const rows = tradeArchive.map((t) => [
+      `"${t.date}"`,
+      `"${t.time}"`,
+      `"${t.tradingMode}"`,
+      `"${t.strategyName}"`,
+      `"${t.tradeTitle.replace(/"/g, '""')}"`,
+      `"${t.tradeSymbol}"`,
+      `"${t.tradeDirection}"`,
+      `"${t.entryPrice}"`,
+      `"${t.exitPrice}"`,
+      `"${t.tradePnL}"`,
+      `"${t.watermarkTag}"`,
+      `"${t.postText.replace(/"/g, '""').replace(/\n/g, ' ')}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Trade_Archive_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    addLog('فایل اکسل (CSV UTF-8) با موفقیت دانلود شد!', 'success');
+  };
+
+  // Delete Record from Archive
+  const deleteTradeRecord = (id: string) => {
+    setTradeArchive((prev) => prev.filter((item) => item.id !== id));
+    addLog('معامله از آرشیو حذف شد', 'info');
+  };
+
+  // Clear Entire Archive
+  const clearEntireArchive = () => {
+    if (window.confirm('آیا از پاکسازی کامل آرشیو معاملات مطمئن هستید؟')) {
+      setTradeArchive([]);
+      addLog('کل آرشیو معاملات پاکسازی گردید', 'info');
     }
   };
 
@@ -241,47 +348,53 @@ export default function App() {
     ctx.fillStyle = '#070b13';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 2. TOP WATERMARK BANNER (2cm / 85px height space, Solid Non-transparent)
-    ctx.fillStyle = '#0f172a'; // Solid dark slate (NO transparency as requested)
+    // 2. TOP WATERMARK BANNER (2cm / 95px height space, Solid Non-transparent)
+    ctx.fillStyle = '#0f172a'; // Solid dark slate background
     ctx.fillRect(0, 0, canvas.width, 95);
     
     // Bottom accent line for top banner
     ctx.fillStyle = '#dc2626'; // Red accent line
     ctx.fillRect(0, 93, canvas.width, 2);
 
-    // Top Right Aligned Text
+    // Top Right Aligned Text Drawing for Post-Trade Notes
     ctx.direction = 'rtl';
     ctx.textAlign = 'right';
 
-    // Top Header Small Badge
+    // Top Header Badge Title
     ctx.font = 'bold 12px Tahoma, Vazirmatn, sans-serif';
     ctx.fillStyle = '#ef4444';
-    ctx.fillText('📝 یادداشت پست / تحلیل رفلکس معامله:', canvas.width - 25, 26);
+    ctx.fillText('📝 یادداشت پست / تحلیل رفلکس معامله (از بالا راست):', canvas.width - 25, 24);
 
-    // Post Text Content (Starting top right)
-    ctx.font = 'bold 15px Tahoma, Vazirmatn, sans-serif';
+    // Post Text Content (Multi-line rendering with support for \n linebreaks)
+    ctx.font = 'bold 14px Tahoma, Vazirmatn, sans-serif';
     ctx.fillStyle = '#f8fafc';
 
-    // Simple multi-line text wrapping for top right post
-    const words = postText.split(' ');
-    let currentLine = '';
-    let lineY = 52;
-    const maxTextWidth = canvas.width - 50;
+    // Split post text into paragraphs by newline
+    const paragraphs = (postText || 'متن پست یا تحلیل معامله خود را وارد کنید...').split('\n');
+    let lineY = 48;
+    const maxLineWidth = canvas.width - 50;
 
-    for (let i = 0; i < words.length; i++) {
-      const testLine = currentLine + words[i] + ' ';
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > maxTextWidth && i > 0) {
-        ctx.fillText(currentLine, canvas.width - 25, lineY);
-        currentLine = words[i] + ' ';
-        lineY += 22;
-        if (lineY > 88) break; // stay within allocated 2cm top header
-      } else {
-        currentLine = testLine;
+    for (const paragraph of paragraphs) {
+      if (lineY > 88) break;
+      const words = paragraph.split(' ');
+      let currentLine = '';
+
+      for (let i = 0; i < words.length; i++) {
+        const testLine = currentLine + words[i] + ' ';
+        const metrics = ctx.measureText(testLine);
+        if (metrics.width > maxLineWidth && i > 0) {
+          ctx.fillText(currentLine, canvas.width - 25, lineY);
+          currentLine = words[i] + ' ';
+          lineY += 20;
+          if (lineY > 88) break;
+        } else {
+          currentLine = testLine;
+        }
       }
-    }
-    if (lineY <= 88) {
-      ctx.fillText(currentLine, canvas.width - 25, lineY);
+      if (lineY <= 88 && currentLine.trim()) {
+        ctx.fillText(currentLine, canvas.width - 25, lineY);
+        lineY += 20;
+      }
     }
 
     // 3. MIDDLE AREA - Chart & Position Graphic (height 585px from y=95 to y=680)
@@ -390,31 +503,36 @@ export default function App() {
 
   const finishCanvasDrawing = (canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) => {
     // 4. BOTTOM WATERMARK BAR (Solid background, Height 120px from y=680 to y=800)
-    ctx.fillStyle = '#090d16'; // Solid background
+    ctx.fillStyle = '#090d16';
     ctx.fillRect(0, 680, canvas.width, 120);
 
     ctx.fillStyle = '#ef4444'; // Red divider line
     ctx.fillRect(0, 680, canvas.width, 2);
 
     // CRITICAL USER REQUIREMENT:
-    // Move Trade Name & Details watermark to BOTTOM-LEFT (پایین چپ)!
+    // STRATEGY NAME & TRADE DETAILS MOVED EXCLUSIVELY TO BOTTOM-LEFT (پایین چپ)!
     ctx.direction = 'ltr';
     ctx.textAlign = 'left';
 
-    // Trade Name (Bottom Left)
-    ctx.font = 'bold 22px Tahoma, Vazirmatn, sans-serif';
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(tradeTitle, 30, 720);
+    // Line 1: Strategy Name & Trading Mode (Bottom Left - x=30, y=715)
+    ctx.font = 'bold 18px Tahoma, Vazirmatn, sans-serif';
+    ctx.fillStyle = '#f59e0b'; // Golden Amber for Strategy Name
+    ctx.fillText(`استراتژی: ${strategyName} (${tradingMode})`, 30, 715);
 
-    // Details Line (Symbol, Direction, PnL - Bottom Left)
+    // Line 2: Trade Title (Bottom Left - x=30, y=742)
     ctx.font = 'bold 16px Tahoma, Vazirmatn, sans-serif';
-    ctx.fillStyle = tradeDirection === 'LONG' ? '#34d399' : '#f43f5e';
-    ctx.fillText(`${tradeSymbol}  |  ${tradeDirection}  |  سود/زیان: ${tradePnL}`, 30, 752);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(tradeTitle, 30, 742);
 
-    // Watermark Tag & Time (Bottom Left)
-    ctx.font = '13px Tahoma, Vazirmatn, sans-serif';
+    // Line 3: Details Line (Symbol, Position, PnL - Bottom Left - x=30, y=766)
+    ctx.font = 'bold 14px Tahoma, Vazirmatn, sans-serif';
+    ctx.fillStyle = tradeDirection === 'LONG' ? '#34d399' : '#f43f5e';
+    ctx.fillText(`${tradeSymbol}  |  ${tradeDirection}  |  سود/زیان: ${tradePnL}`, 30, 766);
+
+    // Line 4: Watermark Tag & Time (Bottom Left - x=30, y=788)
+    ctx.font = '12px Tahoma, Vazirmatn, sans-serif';
     ctx.fillStyle = '#94a3b8';
-    ctx.fillText(`واترمارک: ${watermarkTag}  •  تاریخ ثبت: ${new Date().toLocaleDateString('fa-IR')}`, 30, 780);
+    ctx.fillText(`واترمارک: ${watermarkTag}  •  تاریخ ثبت: ${new Date().toLocaleDateString('fa-IR')}`, 30, 788);
 
     // Right side branding logo (Bottom Right)
     ctx.direction = 'rtl';
@@ -497,100 +615,6 @@ export default function App() {
     setKeyboardText((prev) => prev + '\n');
   };
 
-  // Python Script Content with typing support
-  const pythonScript = `import http.server
-import socketserver
-import subprocess
-import os
-import sys
-
-PORT = ${localPort}
-
-class MonitorHandler(http.server.BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
-
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        self.wfile.write(b'{"status": "running", "keyboard": "active"}')
-
-    def do_POST(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.end_headers()
-        
-        if "/monitor" in self.path:
-            state = "on" if "state=on" in self.path else "off"
-            if sys.platform == "win32":
-                if state == "off":
-                    subprocess.run(["displayswitch.exe", "/internal"], shell=True)
-                else:
-                    subprocess.run(["displayswitch.exe", "/extend"], shell=True)
-            self.wfile.write(bytes(f'{{"success": true, "state": "{state}"}}', "utf-8"))
-
-        elif "/type" in self.path:
-            content_length = int(self.headers.get('Content-Length', 0))
-            body = self.rfile.read(content_length).decode('utf-8')
-            print("Typed from mobile/web virtual keyboard:", body)
-            self.wfile.write(b'{"success": true}')
-
-with socketserver.TCPServer(("", PORT), MonitorHandler) as httpd:
-    print(f"Server started at port {PORT} with Virtual Keyboard listener.")
-    try:
-        httpd.serve_forever()
-    except KeyboardInterrupt:
-        print("\\nStopping server...")`;
-
-  // PowerShell Script Content
-  const powerShellScript = `# PowerShell local monitor & keyboard helper
-$port = ${localPort}
-$listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add("http://localhost:$port/")
-try {
-    $listener.Start()
-    Write-Host "PowerShell listener with Virtual Keyboard running on port $port..." -ForegroundColor Green
-    while ($listener.IsListening) {
-        $context = $listener.GetContext()
-        $req = $context.Request
-        $res = $context.Response
-        
-        $res.Headers.Add("Access-Control-Allow-Origin", "*")
-        $res.Headers.Add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        $res.Headers.Add("Access-Control-Allow-Headers", "Content-Type")
-        
-        if ($req.HttpMethod -eq "OPTIONS") {
-            $res.StatusCode = 200
-            $res.Close()
-            continue
-        }
-        
-        $responseString = '{"status": "ok"}'
-        
-        if ($req.Url.LocalPath -eq "/monitor") {
-            if ($req.Url.Query -like "*state=off*") {
-                & DisplaySwitch.exe /internal
-            } else {
-                & DisplaySwitch.exe /extend
-            }
-        }
-        
-        $buffer = [System.Text.Encoding]::UTF8.GetBytes($responseString)
-        $res.ContentLength64 = $buffer.Length
-        $res.OutputStream.Write($buffer, 0, $buffer.Length)
-        $res.Close()
-    }
-} finally {
-    $listener.Stop()
-}`;
-
   // Virtual Keyboard Render Helper
   const renderVirtualKeyboard = () => (
     <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 sm:p-6 shadow-2xl space-y-4 text-right" dir="rtl">
@@ -598,7 +622,7 @@ try {
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
         <div className="flex items-center gap-2">
           <div className="bg-red-500/20 p-2 rounded-xl border border-red-500/30">
-            <Keyboard className="w-5 h-5 text-red-500 animate-pulse" />
+            <Keyboard className="w-5 h-5 text-red-500" />
           </div>
           <div>
             <h3 className="text-sm font-black text-slate-100 flex items-center gap-1.5">
@@ -683,12 +707,15 @@ try {
             </button>
 
             <button 
-              onClick={() => sendKeyboardTextToDesktop(keyboardText)}
+              onClick={() => {
+                setPostText((prev) => (prev ? prev + '\n' + keyboardText : keyboardText));
+                addLog('متن کیبورد مجازی به یادداشت پست ترید منتقل شد', 'success');
+              }}
               disabled={!keyboardText}
               className="bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white px-3 py-1.5 rounded-xl flex items-center gap-1.5 font-bold transition-all cursor-pointer active:scale-95 shadow-md shadow-red-950/50"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>ارسال به سیستم دسکتاپ</span>
+              <span>انتقال به متن پست ترید</span>
             </button>
           </div>
 
@@ -776,13 +803,16 @@ try {
               return (
                 <button
                   key={sc.key}
-                  onClick={() => sendShortcut(sc.key, sc.label)}
+                  onClick={() => {
+                    addLog(`اجرای میانبر: ${sc.label}`, 'info');
+                    if (sc.key === 'WIN_P') toggleMonitor2();
+                  }}
                   className="bg-slate-900 hover:bg-slate-800 active:scale-95 border border-slate-800 hover:border-amber-500/50 p-3 rounded-2xl flex items-center gap-2.5 text-right transition-all cursor-pointer group"
                 >
-                  <div className="bg-amber-500/10 p-2 rounded-xl group-hover:bg-amber-500/20 text-amber-400 transition-colors">
+                  <div className="bg-amber-500/10 p-2 rounded-xl text-amber-400">
                     <IconComp className="w-4 h-4" />
                   </div>
-                  <span className="text-xs font-bold text-slate-200 group-hover:text-amber-300 transition-colors">
+                  <span className="text-xs font-bold text-slate-200">
                     {sc.label}
                   </span>
                 </button>
@@ -791,11 +821,11 @@ try {
           </div>
         )}
 
-        {/* Common Bottom Control Keys (Space, Backspace, Enter, Clear) */}
+        {/* Common Bottom Control Keys */}
         <div className="pt-2 border-t border-slate-850 flex flex-wrap justify-center gap-1.5 sm:gap-2">
           <button 
             onClick={handleSpace}
-            className="flex-1 min-w-[120px] max-w-[260px] h-10 sm:h-11 bg-slate-850 hover:bg-slate-800 active:bg-slate-750 border border-slate-750 rounded-xl text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+            className="flex-1 min-w-[120px] max-w-[260px] h-10 sm:h-11 bg-slate-850 hover:bg-slate-800 border border-slate-750 rounded-xl text-slate-200 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
           >
             <Space className="w-4 h-4 text-slate-400" />
             <span>فاصله (Space)</span>
@@ -825,29 +855,23 @@ try {
   return (
     <div className="min-h-screen bg-[#070b13] text-slate-100 flex flex-col font-sans selection:bg-red-500/30 overflow-x-hidden" dir="rtl">
       
-      {/* Top Ambient Light Header */}
-      <div className="absolute top-0 inset-x-0 h-48 bg-gradient-to-b from-red-500/5 via-transparent to-transparent pointer-events-none" />
-
       {/* Header */}
-      <header className="border-b border-slate-900 bg-slate-950/60 backdrop-blur-md px-4 sm:px-6 py-4 sticky top-0 z-50">
+      <header className="border-b border-slate-900 bg-slate-950 px-4 sm:px-6 py-4 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="relative">
-              <div className="absolute -inset-1.5 bg-gradient-to-r from-red-600 to-amber-600 rounded-xl blur opacity-30 animate-pulse"></div>
-              <div className="relative bg-slate-900 border border-red-500/30 p-2.5 rounded-xl flex items-center justify-center">
-                <Cpu className="text-red-500 w-5 h-5 animate-pulse" />
-              </div>
+            <div className="bg-slate-900 border border-red-500/30 p-2.5 rounded-xl flex items-center justify-center">
+              <Cpu className="text-red-500 w-5 h-5" />
             </div>
             <div className="text-right">
               <span className="text-[10px] font-black tracking-wider text-red-500 bg-red-950/40 px-2 py-0.5 rounded border border-red-500/20">دستیار هوشمند دسکتاپ</span>
-              <h1 className="text-base sm:text-lg font-black text-slate-100 tracking-tight mt-0.5">مرکز کنترل مانیتورهای سهیل کشتکار</h1>
+              <h1 className="text-base sm:text-lg font-black text-slate-100 tracking-tight mt-0.5">مرکز کنترل مانیتورها و آرشیو معاملات سهیل کشتکار</h1>
             </div>
           </div>
 
-          {/* Controls & Connection Status Badge */}
+          {/* Navigation & Connection Controls */}
           <div className="flex flex-wrap items-center justify-center gap-2.5">
             
-            {/* View Tab Switcher */}
+            {/* Navigation Tabs */}
             <div className="flex items-center gap-1 bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-bold">
               <button 
                 onClick={() => setActiveTab('trade_screenshot')}
@@ -856,8 +880,19 @@ try {
                 }`}
               >
                 <Camera className="w-3.5 h-3.5" />
-                <span>اسکرین‌شات کلوز معامله</span>
+                <span>کلوز معامله و واترمارک</span>
               </button>
+
+              <button 
+                onClick={() => setActiveTab('archive')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  activeTab === 'archive' ? 'bg-emerald-600 text-white shadow' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                <span>آرشیو معاملات و اکسل ({tradeArchive.length})</span>
+              </button>
+
               <button 
                 onClick={() => setActiveTab('desk')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
@@ -869,13 +904,13 @@ try {
               </button>
             </div>
 
-            {/* Prominent Virtual Keyboard Toggle Button */}
+            {/* Virtual Keyboard Toggle */}
             <button 
               onClick={() => setShowKeyboard(!showKeyboard)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all border active:scale-95 cursor-pointer shadow-lg ${
                 showKeyboard 
-                  ? 'bg-red-600 text-white border-red-500 shadow-red-950/50' 
-                  : 'bg-slate-900 hover:bg-slate-850 text-slate-200 border-slate-800 hover:border-red-500/40'
+                  ? 'bg-red-600 text-white border-red-500' 
+                  : 'bg-slate-900 hover:bg-slate-850 text-slate-200 border-slate-800'
               }`}
             >
               <Keyboard className="w-4 h-4 text-red-400" />
@@ -888,32 +923,26 @@ try {
                 type="text" 
                 value={localPort}
                 onChange={(e) => setLocalPort(e.target.value)}
-                className="w-12 bg-slate-950 border border-slate-800 text-red-400 rounded text-center py-0.5 focus:outline-none focus:border-red-500/50 transition-colors"
-                title="پورت سرور محلی"
+                className="w-12 bg-slate-950 border border-slate-800 text-red-400 rounded text-center py-0.5 focus:outline-none focus:border-red-500/50"
               />
             </div>
 
             <button 
               onClick={testLocalConnection}
-              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:border-red-500/30 active:scale-95 cursor-pointer"
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-850 border border-slate-800 text-slate-300 px-3 py-1.5 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              <span>بررسی اتصال</span>
+              <span>تست اتصال</span>
             </button>
 
             {connectionStatus === 'connected' ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/60 border border-emerald-500/30 rounded-xl text-xs font-bold text-emerald-400">
-                <Wifi className="w-3.5 h-3.5 animate-bounce" />
+                <Wifi className="w-3.5 h-3.5" />
                 متصل به دسکتاپ
-              </span>
-            ) : connectionStatus === 'error' ? (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-950/60 border border-rose-500/30 rounded-xl text-xs font-bold text-rose-400">
-                <WifiOff className="w-3.5 h-3.5" />
-                خطای سرور محلی
               </span>
             ) : (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-950/40 border border-amber-500/20 rounded-xl text-xs font-bold text-amber-400">
-                <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" />
+                <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                 شبیه‌ساز مرورگر
               </span>
             )}
@@ -924,9 +953,9 @@ try {
       {/* Main Grid Content */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
         
-        {/* If Virtual Keyboard is Open as Top Drawer or Modal Overlay */}
+        {/* Virtual Keyboard Drawer */}
         {showKeyboard && (
-          <div className="lg:col-span-12 transition-all duration-500 animate-fadeIn">
+          <div className="lg:col-span-12">
             {renderVirtualKeyboard()}
           </div>
         )}
@@ -937,17 +966,17 @@ try {
             {/* Left Col (7 cols): Live Screenshot Preview */}
             <div className="lg:col-span-7 flex flex-col gap-6">
               
-              <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 flex flex-col gap-4 shadow-2xl backdrop-blur-md">
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 sm:p-6 flex flex-col gap-4 shadow-xl">
                 
                 {/* Section Header */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
                   <div className="flex items-center gap-2.5">
                     <div className="bg-red-500/10 p-2.5 rounded-xl border border-red-500/20 text-red-500">
-                      <Camera className="w-5 h-5 animate-pulse" />
+                      <Camera className="w-5 h-5" />
                     </div>
                     <div>
-                      <h2 className="text-sm sm:text-base font-black text-slate-100">پیش‌نمایش اسکرین‌شات کلوز معامله</h2>
-                      <p className="text-[11px] text-slate-400">واتر‌مارک بالایی با فضا و متن پست + واتر‌مارک جزییات در پایین‌چپ</p>
+                      <h2 className="text-sm sm:text-base font-black text-slate-100">پیش‌نمایش زنده اسکرین‌شات کلوز معامله</h2>
+                      <p className="text-[11px] text-slate-400">واتر‌مارک بالایی با فضا و متن پست + واتر‌مارک استراتژی در پایین‌چپ</p>
                     </div>
                   </div>
 
@@ -972,19 +1001,19 @@ try {
                 {/* Simulated Final Canvas / Screenshot Card Preview */}
                 <div className="w-full bg-[#070b13] border-2 border-slate-800 rounded-2xl overflow-hidden shadow-2xl relative flex flex-col font-sans">
                   
-                  {/* TOP WATERMARK BANNER (Allocated 2cm space, Solid Non-Transparent Background, Right-Aligned RTL Text) */}
-                  <div className="bg-[#0f172a] border-b-2 border-red-600 px-5 py-3 flex flex-col gap-1 text-right min-h-[85px] justify-center relative z-10" dir="rtl">
+                  {/* TOP WATERMARK BANNER (Allocated 2cm space, Solid Non-Transparent Slate Background, Right-Aligned RTL Text) */}
+                  <div className="bg-[#0f172a] border-b-2 border-red-600 px-5 py-3 flex flex-col gap-1 text-right min-h-[95px] justify-center relative z-10" dir="rtl">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] font-bold text-red-400 flex items-center gap-1">
-                        <FileText className="w-3 h-3" />
+                        <FileText className="w-3.5 h-3.5" />
                         یادداشت پست / تحلیل رفلکس معامله (از بالا راست):
                       </span>
                       <span className="text-[9px] font-mono text-slate-400 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
-                        فضا اختصاصی ۲ سانتی‌متری (غیر‌ترنسپرنت)
+                        فضا اختصاصی ۲ سانتی‌متری
                       </span>
                     </div>
-                    <p className="text-xs sm:text-sm font-bold text-slate-100 leading-relaxed text-right break-words">
-                      {postText || 'متن پست یا رفلکس معامله خود را وارد کنید...'}
+                    <p className="text-xs sm:text-sm font-bold text-slate-100 leading-relaxed text-right break-words whitespace-pre-wrap">
+                      {postText || 'متن پست یا تحلیل معامله خود را وارد کنید...'}
                     </p>
                   </div>
 
@@ -1004,9 +1033,9 @@ try {
                         <div className="relative z-10 flex flex-col justify-between h-full py-4 space-y-12">
                           
                           {/* Exit Price Marker */}
-                          <div className="flex items-center justify-between bg-emerald-500/20 border-y border-emerald-500 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-emerald-400 backdrop-blur-sm">
+                          <div className="flex items-center justify-between bg-emerald-500/20 border-y border-emerald-500 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-emerald-400">
                             <span className="flex items-center gap-1.5">
-                              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                              <span className="w-2 h-2 rounded-full bg-emerald-400" />
                               سطح خروج (Exit): {exitPrice}
                             </span>
                             <span className="bg-emerald-950 text-emerald-300 px-2 py-0.5 rounded text-[10px] border border-emerald-500/30">
@@ -1014,19 +1043,19 @@ try {
                             </span>
                           </div>
 
-                          {/* Decorative Candlestick Animation Bars */}
+                          {/* Candlestick Graphic Bars */}
                           <div className="flex items-end justify-between h-28 px-4 gap-1 sm:gap-2 opacity-70">
                             <div className="w-full bg-emerald-500/50 h-12 rounded-xs" />
                             <div className="w-full bg-emerald-500/70 h-16 rounded-xs" />
                             <div className="w-full bg-rose-500/60 h-8 rounded-xs" />
                             <div className="w-full bg-emerald-500/80 h-22 rounded-xs" />
-                            <div className="w-full bg-emerald-500/90 h-28 rounded-xs animate-pulse" />
+                            <div className="w-full bg-emerald-500/90 h-28 rounded-xs" />
                             <div className="w-full bg-rose-500/50 h-10 rounded-xs" />
                             <div className="w-full bg-emerald-500/95 h-24 rounded-xs" />
                           </div>
 
                           {/* Entry Price Marker */}
-                          <div className="flex items-center justify-between bg-amber-500/20 border-y border-amber-500 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-amber-400 backdrop-blur-sm">
+                          <div className="flex items-center justify-between bg-amber-500/20 border-y border-amber-500 px-3 py-1.5 rounded-lg text-xs font-mono font-bold text-amber-400">
                             <span className="flex items-center gap-1.5">
                               <span className="w-2 h-2 rounded-full bg-amber-400" />
                               سطح ورود (Entry): {entryPrice}
@@ -1042,13 +1071,22 @@ try {
 
                   </div>
 
-                  {/* BOTTOM WATERMARK BANNER (Moved Trade Details to BOTTOM-LEFT as requested!) */}
+                  {/* BOTTOM WATERMARK BANNER (Strategy Name & Trade Details positioned EXCLUSIVELY on Bottom-Left!) */}
                   <div className="bg-[#090d16] border-t-2 border-red-600 px-5 py-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative z-10">
                     
-                    {/* BOTTOM LEFT DETAILS (نام معامله و دیگر جزییات منتقل شده به پایین چپ) */}
-                    <div className="text-left font-sans space-y-0.5 order-2 sm:order-1" dir="ltr">
+                    {/* BOTTOM LEFT WATERMARK DETAILS (استراتژی، عنوان و جزییات در پایین‌چپ) */}
+                    <div className="text-left font-sans space-y-1 order-2 sm:order-1" dir="ltr">
+                      
+                      {/* Strategy Name Banner (Amber Highlight) */}
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-black text-slate-100 tracking-tight">{tradeTitle}</span>
+                        <span className="text-xs sm:text-sm font-black text-amber-400 bg-amber-950/60 px-2.5 py-0.5 rounded border border-amber-500/30">
+                          استراتژی: {strategyName} ({tradingMode})
+                        </span>
+                      </div>
+
+                      {/* Trade Title */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs sm:text-sm font-black text-slate-100">{tradeTitle}</span>
                         <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
                           tradeDirection === 'LONG' ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30' : 'bg-rose-950 text-rose-400 border border-rose-500/30'
                         }`}>
@@ -1056,7 +1094,8 @@ try {
                         </span>
                       </div>
                       
-                      <div className="flex flex-wrap items-center gap-3 text-xs font-bold">
+                      {/* Symbol & PnL */}
+                      <div className="flex flex-wrap items-center gap-2.5 text-xs font-bold">
                         <span className="text-sky-400 font-mono">{tradeSymbol}</span>
                         <span className="text-slate-600">•</span>
                         <span className={tradeDirection === 'LONG' ? 'text-emerald-400 font-mono' : 'text-rose-400 font-mono'}>
@@ -1064,38 +1103,51 @@ try {
                         </span>
                       </div>
 
-                      <div className="text-[10px] text-slate-400 font-mono pt-0.5 flex items-center gap-1.5">
+                      {/* Watermark Tag & Date */}
+                      <div className="text-[10px] text-slate-400 font-mono flex items-center gap-1.5 pt-0.5">
                         <span className="text-amber-400 font-bold">{watermarkTag}</span>
                         <span>•</span>
-                        <span>{new Date().toLocaleDateString('fa-IR')}</span>
+                        <span>تاریخ ثبت: {new Date().toLocaleDateString('fa-IR')}</span>
                       </div>
                     </div>
 
                     {/* BOTTOM RIGHT BRANDING BADGE */}
                     <div className="text-right sm:text-right order-1 sm:order-2 border-b sm:border-b-0 border-slate-800 pb-2 sm:pb-0 w-full sm:w-auto" dir="rtl">
                       <span className="text-xs font-black text-slate-200 block">سهیل کشتکار</span>
-                      <span className="text-[10px] text-slate-500 block font-mono">Trading Desk Close Reflex</span>
+                      <span className="text-[10px] text-slate-500 block font-mono">Trading Desk Reflex Report</span>
                     </div>
 
                   </div>
 
                 </div>
 
-                {/* Primary Export Action Buttons */}
+                {/* Primary Export & Save Action Buttons */}
                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    
+                    {/* DOWNLOAD SCREENSHOT BUTTON */}
                     <button 
                       onClick={generateAndDownloadScreenshot}
                       disabled={isGeneratingCanvas}
-                      className="bg-red-600 hover:bg-red-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer active:scale-95 shadow-lg shadow-red-950/50 disabled:opacity-50"
+                      className="bg-red-600 hover:bg-red-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer active:scale-95 shadow-lg shadow-red-950/50 disabled:opacity-50"
                     >
                       <Download className="w-4 h-4" />
-                      <span>{isGeneratingCanvas ? 'در حال ایجاد تصویر...' : 'دانلود اسکرین‌شات کلوز معامله (PNG)'}</span>
+                      <span>{isGeneratingCanvas ? 'در حال ساخت تصویر...' : 'دانلود اسکرین‌شات واتر‌مارک دار (PNG)'}</span>
                     </button>
 
+                    {/* SAVE TO ARCHIVE & EXCEL BUTTON */}
+                    <button 
+                      onClick={saveTradeToArchive}
+                      className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer active:scale-95 shadow-lg shadow-emerald-950/50"
+                    >
+                      <Database className="w-4 h-4" />
+                      <span>ذخیره در آرشیو معامله و اکسل</span>
+                    </button>
+
+                    {/* COPY POST TEXT */}
                     <button 
                       onClick={() => copyToClipboard(postText, 'post_text')}
-                      className="bg-slate-800 hover:bg-slate-750 text-slate-200 px-3.5 py-2.5 rounded-xl text-xs font-bold border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                      className="bg-slate-800 hover:bg-slate-750 text-slate-200 px-3 py-2.5 rounded-xl text-xs font-bold border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                     >
                       {copiedText === 'post_text' ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
                       <span>{copiedText === 'post_text' ? 'کپی شد!' : 'کپی متن پست'}</span>
@@ -1103,7 +1155,7 @@ try {
                   </div>
 
                   <span className="text-[10px] text-slate-500 font-mono">
-                    فرمت خروجی: 1200x800 PNG با واتر‌مارک
+                    واتر‌مارک دقیق با فضا ۲ سانت بالایی + پایین‌چپ
                   </span>
                 </div>
 
@@ -1114,19 +1166,60 @@ try {
             {/* Right Col (5 cols): Form Control Panel */}
             <div className="lg:col-span-5 flex flex-col gap-6">
               
-              <div className="bg-slate-900/40 border border-slate-800 rounded-[2rem] p-5 sm:p-6 flex flex-col gap-4 backdrop-blur-md">
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 sm:p-6 flex flex-col gap-4">
                 <div className="flex items-center gap-2 border-b border-slate-800 pb-3">
                   <Settings className="w-5 h-5 text-red-500" />
                   <div>
-                    <h3 className="text-sm font-black text-slate-100">تنظیمات واتر‌مارک و پست</h3>
-                    <p className="text-[10px] text-slate-400">مشخصات معامله و متن رفلکس را تغییر دهید</p>
+                    <h3 className="text-sm font-black text-slate-100">تنظیمات واتر‌مارک، استراتژی و پست‌ترید</h3>
+                    <p className="text-[10px] text-slate-400">اطلاعات معامله و متن پست تحلیلی را وارد کنید</p>
                   </div>
                 </div>
 
                 {/* Form Inputs */}
                 <div className="space-y-3 text-right" dir="rtl">
                   
-                  {/* Post Text Input (Top Watermark) */}
+                  {/* Trading Mode Selector (اسپایک، اسکالپ، سوئینگ، آر‌تی‌ام) */}
+                  <div>
+                    <label className="block text-xs font-bold text-amber-400 mb-1 flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5" />
+                      <span>حالت معامله (Trading Mode):</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-xs">
+                      {[
+                        'مد اسپایک (Spike Mode)',
+                        'مد اسکالپ (Scalp Mode)',
+                        'مد سوئینگ (Swing Mode)',
+                        'مد آر‌تی‌ام (RTM Mode)'
+                      ].map((mode) => (
+                        <button
+                          key={mode}
+                          onClick={() => setTradingMode(mode)}
+                          className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center ${
+                            tradingMode === mode ? 'bg-amber-500 text-slate-950 shadow' : 'text-slate-400 hover:text-slate-200'
+                          }`}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Strategy Name (واترمارک پایین-چپ) */}
+                  <div>
+                    <label className="block text-xs font-bold text-amber-400 mb-1 flex items-center gap-1.5">
+                      <Crosshair className="w-3.5 h-3.5" />
+                      <span>نام استراتژی (واتر‌مارک پایین-چپ):</span>
+                    </label>
+                    <input 
+                      type="text" 
+                      value={strategyName}
+                      onChange={(e) => setStrategyName(e.target.value)}
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-amber-300 font-bold focus:outline-none focus:border-amber-500/50"
+                      placeholder="مثلاً: اسپایک شکست مقاومت / RTM / ICT..."
+                    />
+                  </div>
+
+                  {/* Post Text Input (Top Watermark 2cm) */}
                   <div>
                     <label className="block text-xs font-bold text-red-400 mb-1 flex items-center justify-between">
                       <span>متن پست / تحلیل رفلکس (واتر‌مارک بالا - ۲ سانت):</span>
@@ -1250,8 +1343,8 @@ try {
                 </div>
 
                 {/* Information Tip */}
-                <div className="bg-red-950/20 border border-red-500/20 p-3 rounded-xl text-[11px] text-red-300 leading-relaxed text-right" dir="rtl">
-                  <span className="font-bold">نکته کاربردی:</span> متنی که در کادر بالا می‌نویسید در بالاترین قسمت اسکرین‌شات (با فضا اختصاصی حدود ۲ سانتی‌متر و پس‌زمینه غیر‌ترنسپرنت) از سمت بالا راست ثبت می‌شود و نام معامله و بقیه جزییات دقیقاً به پایین‌چپ منتقل می‌شوند.
+                <div className="bg-emerald-950/30 border border-emerald-500/20 p-3 rounded-xl text-[11px] text-emerald-300 leading-relaxed text-right" dir="rtl">
+                  <span className="font-bold">بروزرسانی جدید:</span> متن پست ترید در بالا راست، و نام استراتژی ({strategyName}) به همراه جزییات معامله دقیقاً در **پایین-چپ** قرار می‌گیرد و با دکمه "ذخیره در آرشیو معامله و اکسل" تمامی یادداشت‌های مد اسپایک در خروجی فایل اکسل ثبت می‌شود.
                 </div>
 
               </div>
@@ -1260,361 +1353,362 @@ try {
           </>
         )}
 
+        {/* TRADE ARCHIVE & EXCEL EXPORT VIEW */}
+        {activeTab === 'archive' && (
+          <div className="lg:col-span-12 flex flex-col gap-6">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-5 sm:p-6 flex flex-col gap-4">
+              
+              {/* Archive Header */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-emerald-500/10 p-3 rounded-2xl border border-emerald-500/20 text-emerald-400">
+                    <FileSpreadsheet className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-black text-slate-100">آرشیو جامع معاملات و خروجی اکسل</h2>
+                    <p className="text-xs text-slate-400 mt-0.5">ثبت گزارشات کامل معامله شامل حالت اسپایک، استراتژی و متن یادداشت پست‌ترید</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={exportArchiveToExcel}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer active:scale-95 shadow-lg shadow-emerald-950/50"
+                  >
+                    <FileSpreadsheet className="w-4 h-4" />
+                    <span>دانلود خروجی اکسل (CSV UTF-8)</span>
+                  </button>
+
+                  <button 
+                    onClick={clearEntireArchive}
+                    className="bg-slate-800 hover:bg-rose-950 hover:text-rose-400 text-slate-300 px-3 py-2 rounded-xl text-xs font-bold border border-slate-700 transition-all cursor-pointer active:scale-95 flex items-center gap-1.5"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>پاکسازی آرشیو</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Archive Data Table */}
+              {tradeArchive.length === 0 ? (
+                <div className="py-12 text-center text-slate-500 text-xs space-y-2">
+                  <Database className="w-8 h-8 mx-auto text-slate-600" />
+                  <p>هیچ معامله‌ای در آرشیو ثبت نشده است.</p>
+                  <p className="text-[11px] text-slate-600">از تب "کلوز معامله و واترمارک"، روی دکمه "ذخیره در آرشیو معامله و اکسل" کلیک کنید.</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-right text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 font-bold text-[11px]">
+                        <th className="p-3">تاریخ و زمان</th>
+                        <th className="p-3">حالت معامله</th>
+                        <th className="p-3">نام استراتژی</th>
+                        <th className="p-3">عنوان / نماد</th>
+                        <th className="p-3">پوزیشن</th>
+                        <th className="p-3">قیمت ورود / خروج</th>
+                        <th className="p-3">سود/زیان (PnL)</th>
+                        <th className="p-3">یادداشت و تحلیل پست‌ترید</th>
+                        <th className="p-3 text-center">عملیات</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-850">
+                      {tradeArchive.map((item) => (
+                        <tr key={item.id} className="hover:bg-slate-850/50 transition-colors">
+                          <td className="p-3 font-mono text-[11px] text-slate-400 whitespace-nowrap">
+                            <div>{item.date}</div>
+                            <div className="text-[10px] text-slate-500">{item.time}</div>
+                          </td>
+                          <td className="p-3 whitespace-nowrap">
+                            <span className="bg-amber-950/80 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-[10px] font-bold">
+                              {item.tradingMode}
+                            </span>
+                          </td>
+                          <td className="p-3 font-bold text-amber-300 max-w-[150px] truncate">
+                            {item.strategyName}
+                          </td>
+                          <td className="p-3 font-bold text-slate-200 whitespace-nowrap">
+                            <div>{item.tradeTitle}</div>
+                            <span className="text-[10px] text-sky-400 font-mono">{item.tradeSymbol}</span>
+                          </td>
+                          <td className="p-3 whitespace-nowrap">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                              item.tradeDirection === 'LONG' ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/30' : 'bg-rose-950 text-rose-400 border border-rose-500/30'
+                            }`}>
+                              {item.tradeDirection}
+                            </span>
+                          </td>
+                          <td className="p-3 font-mono text-[11px] whitespace-nowrap">
+                            <div className="text-amber-400">ورود: {item.entryPrice}</div>
+                            <div className="text-emerald-400">خروج: {item.exitPrice}</div>
+                          </td>
+                          <td className="p-3 font-mono font-bold text-emerald-400 whitespace-nowrap">
+                            {item.tradePnL}
+                          </td>
+                          <td className="p-3 text-slate-300 max-w-[280px] leading-relaxed text-[11px]">
+                            <p className="line-clamp-2">{item.postText}</p>
+                          </td>
+                          <td className="p-3 text-center whitespace-nowrap">
+                            <button 
+                              onClick={() => deleteTradeRecord(item.id)}
+                              className="bg-slate-800 hover:bg-rose-900 text-slate-400 hover:text-rose-200 p-1.5 rounded-lg transition-colors cursor-pointer"
+                              title="حذف از آرشیو"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+            </div>
+          </div>
+        )}
+
         {/* DESK MONITOR CONTROL VIEW */}
         {activeTab === 'desk' && (
           <>
             {/* Left / Top - Visual Studio and Desk Simulation (7 cols) */}
             <div className="lg:col-span-7 flex flex-col gap-6">
-          
-          {/* Virtual Desk Simulator Screen */}
-          <div className="bg-slate-900/30 border border-slate-800/80 rounded-[2rem] p-6 flex flex-col items-center justify-between shadow-2xl relative overflow-hidden backdrop-blur-sm">
-            <div className="absolute top-0 right-0 p-4">
-              <span className="text-[10px] font-mono text-slate-500 bg-slate-950/80 border border-slate-850 px-2 py-0.5 rounded">نمای شماتیک دسکتاپ</span>
-            </div>
-
-            {/* Glowing Wall Ambient Light based on Monitor 2 State */}
-            <div className={`absolute -top-12 w-96 h-48 rounded-full filter blur-[80px] transition-all duration-1000 pointer-events-none ${
-              monitor2Active 
-                ? 'bg-gradient-to-r from-red-600/10 via-slate-800/5 to-amber-600/10 scale-125' 
-                : 'bg-red-950/5 scale-75'
-            }`} />
-
-            {/* Simulated Dual Monitors */}
-            <div className="w-full flex flex-col md:flex-row items-center justify-center gap-8 py-10 mt-4">
               
-              {/* Monitor 1 (Always On - Primary display) */}
-              <div className="flex flex-col items-center group">
-                <div className="w-64 h-40 bg-slate-950 border-2 border-slate-750 rounded-xl p-2 shadow-[0_12px_30px_rgba(0,0,0,0.6)] relative flex flex-col justify-between transition-transform duration-500 group-hover:scale-102">
-                  <div className="absolute top-2 right-2 flex gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-                  </div>
-                  
-                  {/* Inside Screen 1 Content */}
-                  <div className="flex-1 flex flex-col justify-between pt-4 font-mono text-[9px] text-slate-400">
-                    <div className="flex items-center gap-2 border-b border-slate-900 pb-1.5 mb-1.5 text-[10px] text-red-400 font-bold">
-                      <Monitor className="w-3 h-3" />
-                      <span>مانیتور اصلی (۱)</span>
-                    </div>
-                    
-                    {/* Live Chart Simulator */}
-                    <div className="flex-1 flex flex-col justify-end gap-1.5 h-20 bg-slate-900/60 p-1.5 rounded border border-slate-900 overflow-hidden">
-                      <div className="flex justify-between items-center text-[8px] text-slate-500">
-                        <span>BTC/USD 1m</span>
-                        <span className="text-emerald-400 font-sans font-bold">● LIVE</span>
-                      </div>
-                      <div className="flex items-end justify-between h-8 gap-0.5 px-1 pt-2">
-                        <div className="w-full bg-emerald-500/45 h-3 rounded-sm" />
-                        <div className="w-full bg-emerald-500/60 h-5 rounded-sm" />
-                        <div className="w-full bg-rose-500/50 h-2 rounded-sm" />
-                        <div className="w-full bg-emerald-500/80 h-7 rounded-sm" />
-                        <div className="w-full bg-rose-500/70 h-4 rounded-sm" />
-                        <div className="w-full bg-emerald-500/90 h-6 rounded-sm animate-pulse" />
-                      </div>
-                    </div>
-                    <span className="text-[7px] text-center text-slate-600 mt-1">Trading Desk Assistant v1.0</span>
-                  </div>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-between shadow-xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4">
+                  <span className="text-[10px] font-mono text-slate-500 bg-slate-950 border border-slate-850 px-2 py-0.5 rounded">نمای شماتیک دسکتاپ</span>
                 </div>
-                {/* Stand */}
-                <div className="w-10 h-6 bg-slate-800 border-x border-slate-700" />
-                <div className="w-24 h-2.5 bg-slate-750 rounded-t-lg shadow-inner" />
+
+                {/* Simulated Dual Monitors */}
+                <div className="w-full flex flex-col md:flex-row items-center justify-center gap-8 py-10 mt-4">
+                  
+                  {/* Monitor 1 (Primary display) */}
+                  <div className="flex flex-col items-center group">
+                    <div className="w-64 h-40 bg-slate-950 border-2 border-slate-750 rounded-xl p-2 shadow-2xl relative flex flex-col justify-between">
+                      <div className="flex-1 flex flex-col justify-between pt-4 font-mono text-[9px] text-slate-400">
+                        <div className="flex items-center gap-2 border-b border-slate-900 pb-1.5 mb-1.5 text-[10px] text-red-400 font-bold">
+                          <Monitor className="w-3 h-3" />
+                          <span>مانیتور اصلی (۱)</span>
+                        </div>
+                        
+                        <div className="flex-1 flex flex-col justify-end gap-1.5 h-20 bg-slate-900/60 p-1.5 rounded border border-slate-900 overflow-hidden">
+                          <div className="flex justify-between items-center text-[8px] text-slate-500">
+                            <span>BTC/USD 1m</span>
+                            <span className="text-emerald-400 font-sans font-bold">LIVE</span>
+                          </div>
+                          <div className="flex items-end justify-between h-8 gap-0.5 px-1 pt-2">
+                            <div className="w-full bg-emerald-500/45 h-3 rounded-sm" />
+                            <div className="w-full bg-emerald-500/60 h-5 rounded-sm" />
+                            <div className="w-full bg-rose-500/50 h-2 rounded-sm" />
+                            <div className="w-full bg-emerald-500/80 h-7 rounded-sm" />
+                            <div className="w-full bg-rose-500/70 h-4 rounded-sm" />
+                            <div className="w-full bg-emerald-500/90 h-6 rounded-sm" />
+                          </div>
+                        </div>
+                        <span className="text-[7px] text-center text-slate-600 mt-1">Trading Desk Assistant v1.0</span>
+                      </div>
+                    </div>
+                    <div className="w-10 h-6 bg-slate-800 border-x border-slate-700" />
+                    <div className="w-24 h-2.5 bg-slate-750 rounded-t-lg shadow-inner" />
+                  </div>
+
+                  {/* Monitor 2 (Secondary display) */}
+                  <div className="flex flex-col items-center group">
+                    <div className={`w-64 h-40 border-2 rounded-xl p-2 shadow-2xl relative flex flex-col justify-between transition-all duration-300 ${
+                      monitor2Active 
+                        ? 'bg-slate-900 border-red-500/40 shadow-red-950/20' 
+                        : 'bg-slate-950 border-slate-900 opacity-60'
+                    }`}>
+                      <div className="absolute bottom-2 left-2 flex items-center gap-1">
+                        <div className={`w-1.5 h-1.5 rounded-full ${monitor2Active ? 'bg-emerald-400' : 'bg-amber-600'}`} />
+                        <span className="text-[7px] font-mono text-slate-500">{monitor2Active ? 'Active' : 'Standby'}</span>
+                      </div>
+
+                      {monitor2Active ? (
+                        <div className="flex-1 flex flex-col justify-between pt-4 font-mono text-[9px] text-slate-400">
+                          <div className="flex items-center gap-2 border-b border-slate-800 pb-1.5 mb-1.5 text-[10px] text-amber-400 font-bold">
+                            <Monitor className="w-3 h-3 text-red-500" />
+                            <span>صفحه دوم مانیتور (۲)</span>
+                          </div>
+                          
+                          <div className="flex-1 rounded bg-slate-900 border border-slate-800 overflow-hidden relative flex flex-col justify-center items-center p-3">
+                            <span className="text-[14px] font-sans font-black text-slate-300 tracking-widest uppercase">SOHEIL</span>
+                            <span className="text-[8px] text-red-500 font-bold mt-1">S E C O N D A R Y</span>
+                            
+                            <div className="absolute bottom-1 right-2 left-2 flex justify-between text-[7px] text-slate-500">
+                              <span>درخشندگی: {brightness}%</span>
+                              <span>فرمان فعال</span>
+                            </div>
+                          </div>
+                          <span className="text-[7px] text-center text-slate-600 mt-1">HDMI-2 / DisplaySwitch Link</span>
+                        </div>
+                      ) : (
+                        <div className="flex-1 flex flex-col items-center justify-center text-slate-600">
+                          <Power className="w-8 h-8 opacity-20 stroke-[1.5]" />
+                          <span className="text-[10px] font-bold tracking-wider mt-2 uppercase font-sans">Power Off</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className={`w-10 h-6 border-x ${monitor2Active ? 'bg-slate-800 border-slate-700' : 'bg-slate-900 border-slate-850'}`} />
+                    <div className={`w-24 h-2.5 rounded-t-lg ${monitor2Active ? 'bg-slate-750 shadow-inner' : 'bg-slate-850'}`} />
+                  </div>
+
+                </div>
+
+                <div className="w-full h-2 bg-gradient-to-r from-red-950 via-amber-950 to-red-950 rounded-full border border-slate-850/50 mt-2" />
               </div>
 
-              {/* Monitor 2 (Toggle State - Secondary display) */}
-              <div className="flex flex-col items-center group">
-                <div className={`w-64 h-40 border-2 rounded-xl p-2 shadow-[0_12px_30px_rgba(0,0,0,0.6)] relative flex flex-col justify-between transition-all duration-700 ${
-                  monitor2Active 
-                    ? 'bg-gradient-to-br from-slate-900 to-slate-950 border-red-500/40 shadow-red-950/20 scale-102' 
-                    : 'bg-slate-950 border-slate-900 opacity-60 scale-98 shadow-none'
-                }`}>
-                  <div className="absolute top-2 right-2 flex gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                    <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
-                  </div>
+              {/* Sliders & Timer */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+                  <h3 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Sliders className="w-4 h-4 text-red-500" />
+                    تنظیمات پیشرفته نمایشگر ۲
+                  </h3>
                   
-                  {/* Indicator Light */}
-                  <div className="absolute bottom-2 left-2 flex items-center gap-1">
-                    <div className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${monitor2Active ? 'bg-emerald-400 animate-pulse' : 'bg-amber-600'}`} />
-                    <span className="text-[7px] font-mono text-slate-500">{monitor2Active ? 'Active' : 'Standby'}</span>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs text-slate-400">
+                      <span>شبیه‌ساز درخشندگی</span>
+                      <span className="font-mono text-red-400 font-bold">{brightness}%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min="10" 
+                      max="100" 
+                      value={brightness}
+                      onChange={(e) => setBrightness(parseInt(e.target.value))}
+                      disabled={!monitor2Active}
+                      className="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
+                    />
                   </div>
 
-                  {/* Inside Screen 2 Content */}
-                  {monitor2Active ? (
-                    <div className="flex-1 flex flex-col justify-between pt-4 font-mono text-[9px] text-slate-400 transition-opacity duration-500">
-                      <div className="flex items-center gap-2 border-b border-slate-800 pb-1.5 mb-1.5 text-[10px] text-amber-400 font-bold">
-                        <Monitor className="w-3 h-3 text-red-500" />
-                        <span>صفحه دوم مانیتور (۲)</span>
-                      </div>
-                      
-                      {/* Premium Wallpaper Visualizer */}
-                      <div className="flex-1 rounded bg-slate-900 border border-slate-800/80 overflow-hidden relative flex flex-col justify-center items-center p-3">
-                        <div className="absolute inset-0 bg-gradient-to-br from-red-600/10 via-transparent to-amber-500/15" />
-                        <span className="text-[14px] font-sans font-black text-slate-300 drop-shadow-md tracking-widest uppercase">SOHEIL</span>
-                        <span className="text-[8px] text-red-500 font-bold mt-1">S E C O N D A R Y</span>
-                        
-                        <div className="absolute bottom-1 right-2 left-2 flex justify-between text-[7px] text-slate-500">
-                          <span>درخشندگی: {brightness}%</span>
-                          <span>فرمان فعال</span>
-                        </div>
-                      </div>
-                      <span className="text-[7px] text-center text-slate-600 mt-1">HDMI-2 / DisplaySwitch Link</span>
-                    </div>
-                  ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-slate-600 transition-opacity duration-500">
-                      <Power className="w-8 h-8 opacity-20 stroke-[1.5]" />
-                      <span className="text-[10px] font-bold tracking-wider mt-2 uppercase font-sans">Power Off</span>
+                  <div className="flex justify-between items-center bg-slate-950 p-2 rounded-xl border border-slate-850 text-xs">
+                    <span className="text-slate-400">حالت آماده‌باش (Standby):</span>
+                    <span className="font-mono font-bold text-amber-500">موتور DDC/CI فعال</span>
+                  </div>
+                </div>
+
+                <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+                  <h3 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 text-amber-500" />
+                    تایمر خاموشی خودکار
+                  </h3>
+                  
+                  <div className="flex items-center gap-2">
+                    <select 
+                      value={timerDuration} 
+                      onChange={(e) => setTimerDuration(parseInt(e.target.value))}
+                      disabled={timerActive}
+                      className="flex-1 bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-red-500/50 cursor-pointer disabled:opacity-50"
+                    >
+                      <option value={30}>۳۰ ثانیه (جهت تست سریع)</option>
+                      <option value={300}>۵ دقیقه</option>
+                      <option value={900}>۱۵ دقیقه</option>
+                      <option value={1800}>۳۰ دقیقه</option>
+                      <option value={3600}>۱ ساعت</option>
+                    </select>
+
+                    <button 
+                      onClick={startTimer}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer ${
+                        timerActive 
+                          ? 'bg-rose-950 text-rose-400 border border-rose-500/30 hover:bg-rose-900' 
+                          : 'bg-slate-950 hover:bg-slate-850 text-slate-200 border border-slate-800'
+                      }`}
+                    >
+                      {timerActive ? 'لغو تایمر' : 'فعال‌سازی'}
+                    </button>
+                  </div>
+
+                  {timerActive && (
+                    <div className="flex items-center justify-between bg-red-950/30 border border-red-500/20 px-3 py-1.5 rounded-xl text-xs">
+                      <span className="text-red-400">مانیتور ۲ خاموش می‌شود در:</span>
+                      <span className="font-mono font-black text-red-400 tracking-wider">{getDurationLabel(timeLeft)}</span>
                     </div>
                   )}
                 </div>
-                {/* Stand */}
-                <div className={`w-10 h-6 border-x transition-colors duration-700 ${monitor2Active ? 'bg-slate-800 border-slate-700' : 'bg-slate-900 border-slate-850'}`} />
-                <div className={`w-24 h-2.5 rounded-t-lg transition-colors duration-700 ${monitor2Active ? 'bg-slate-750 shadow-inner' : 'bg-slate-850'}`} />
+              </div>
+
+              {/* Console Logs */}
+              <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 flex flex-col gap-3">
+                <h3 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
+                  <Terminal className="w-4 h-4 text-red-500" />
+                  کنسول گزارش رویدادها
+                </h3>
+                <div className="h-32 bg-slate-950 border border-slate-900 rounded-xl p-3 font-mono text-[10px] overflow-y-auto space-y-2 flex flex-col-reverse custom-scrollbar">
+                  {logs.map((log) => (
+                    <div key={log.id} className="flex items-start gap-2.5 border-b border-slate-900/50 pb-1 last:border-0 leading-relaxed">
+                      <span className="text-slate-500 text-[9px] shrink-0">{log.time}</span>
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${
+                        log.status === 'success' ? 'bg-emerald-400' : log.status === 'error' ? 'bg-rose-500' : 'bg-sky-400'
+                      }`} />
+                      <span className={log.status === 'success' ? 'text-emerald-400' : log.status === 'error' ? 'text-rose-400' : 'text-slate-300'}>
+                        {log.action}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
 
             </div>
 
-            {/* Wood Desktop Simulator Line */}
-            <div className="w-full h-2 bg-gradient-to-r from-red-950 via-amber-950 to-red-950 rounded-full border border-slate-850/50 shadow-lg mt-2" />
-          </div>
-
-          {/* Dedicated Virtual Keyboard Quick Card on Main Panel */}
-          {!showKeyboard && (
-            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="bg-red-500/10 p-3 rounded-xl border border-red-500/20">
-                  <Keyboard className="w-6 h-6 text-red-500" />
-                </div>
-                <div className="text-right">
-                  <h3 className="text-sm font-bold text-slate-200">صفحه کلید لمسی و مجازی</h3>
-                  <p className="text-xs text-slate-400">تایپ فارسی/انگلیسی و میانبرها برای کنترل از موبایل و ویندوز</p>
-                </div>
-              </div>
-
-              <button 
-                onClick={() => setShowKeyboard(true)}
-                className="w-full sm:w-auto bg-red-600 hover:bg-red-500 text-white px-5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-md shadow-red-950/40 shrink-0 flex items-center justify-center gap-2"
-              >
-                <Keyboard className="w-4 h-4" />
-                <span>نمایش صفحه کلید مجازی</span>
-              </button>
-            </div>
-          )}
-
-          {/* Quick Sliders & Brightness Simulation */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            
-            {/* Custom Control Options */}
-            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3">
-              <h3 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <Sliders className="w-4 h-4 text-red-500" />
-                تنظیمات پیشرفته نمایشگر ۲
-              </h3>
+            {/* Right / Bottom - Controller (5 cols) */}
+            <div className="lg:col-span-5 flex flex-col gap-6">
               
-              <div className="space-y-1">
-                <div className="flex justify-between text-xs text-slate-400">
-                  <span>شبیه‌ساز درخشندگی</span>
-                  <span className="font-mono text-red-400 font-bold">{brightness}%</span>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col items-center justify-between text-center relative overflow-hidden">
+                <div className="space-y-1 mt-2">
+                  <h2 className="text-base font-black text-slate-100">کلید فرمان سخت‌افزاری</h2>
+                  <p className="text-xs text-slate-400 leading-relaxed">با فشردن کلید زیر، فرمان روشن/خاموش به صفحه نمایش دوم صادر می‌شود.</p>
                 </div>
-                <input 
-                  type="range" 
-                  min="10" 
-                  max="100" 
-                  value={brightness}
-                  onChange={(e) => setBrightness(parseInt(e.target.value))}
-                  disabled={!monitor2Active}
-                  className="w-full h-1.5 bg-slate-950 rounded-lg appearance-none cursor-pointer accent-red-500 disabled:opacity-30 disabled:cursor-not-allowed"
-                />
-              </div>
 
-              <div className="flex justify-between items-center bg-slate-950/40 p-2 rounded-xl border border-slate-850/50 text-xs">
-                <span className="text-slate-400">حالت آماده‌باش (Standby):</span>
-                <span className="font-mono font-bold text-amber-500">موتور DDC/CI فعال</span>
-              </div>
-            </div>
-
-            {/* Quick Timer Setup */}
-            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-4 flex flex-col gap-3">
-              <h3 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                <Clock className="w-4 h-4 text-amber-500" />
-                تایمر خاموشی خودکار
-              </h3>
-              
-              <div className="flex items-center gap-2">
-                <select 
-                  value={timerDuration} 
-                  onChange={(e) => setTimerDuration(parseInt(e.target.value))}
-                  disabled={timerActive}
-                  className="flex-1 bg-slate-950 border border-slate-800 text-slate-200 text-xs rounded-xl px-3 py-2 focus:outline-none focus:border-red-500/50 cursor-pointer disabled:opacity-50"
-                >
-                  <option value={30}>۳۰ ثانیه (جهت تست سریع)</option>
-                  <option value={300}>۵ دقیقه</option>
-                  <option value={900}>۱۵ دقیقه</option>
-                  <option value={1800}>۳۰ دقیقه</option>
-                  <option value={3600}>۱ ساعت</option>
-                </select>
-
-                <button 
-                  onClick={startTimer}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all active:scale-95 cursor-pointer ${
-                    timerActive 
-                      ? 'bg-rose-950 text-rose-400 border border-rose-500/30 hover:bg-rose-900' 
-                      : 'bg-slate-950 hover:bg-slate-850 text-slate-200 border border-slate-800'
-                  }`}
-                >
-                  {timerActive ? 'لغو تایمر' : 'فعال‌سازی'}
-                </button>
-              </div>
-
-              {timerActive && (
-                <div className="flex items-center justify-between bg-red-950/30 border border-red-500/20 px-3 py-1.5 rounded-xl text-xs animate-pulse">
-                  <span className="text-red-400">مانیتور ۲ خاموش می‌شود در:</span>
-                  <span className="font-mono font-black text-red-400 tracking-wider">{getDurationLabel(timeLeft)}</span>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Activity Console Logs */}
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-[1.5rem] p-4 flex flex-col gap-3">
-            <h3 className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-              <Terminal className="w-4 h-4 text-red-500" />
-              کنسول گزارش رویدادها
-            </h3>
-            <div className="h-32 bg-slate-950 border border-slate-900 rounded-xl p-3 font-mono text-[10px] overflow-y-auto space-y-2 flex flex-col-reverse custom-scrollbar">
-              {logs.map((log) => (
-                <div key={log.id} className="flex items-start gap-2.5 border-b border-slate-900/50 pb-1 last:border-0 leading-relaxed">
-                  <span className="text-slate-500 text-[9px] shrink-0">{log.time}</span>
-                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${
-                    log.status === 'success' ? 'bg-emerald-400' : log.status === 'error' ? 'bg-rose-500' : 'bg-sky-400'
-                  }`} />
-                  <span className={log.status === 'success' ? 'text-emerald-400' : log.status === 'error' ? 'text-rose-400' : 'text-slate-300'}>
-                    {log.action}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
-
-        {/* Right / Bottom - Controller & Scripts (5 cols) */}
-        <div className="lg:col-span-5 flex flex-col gap-6">
-          
-          {/* Main Controller Power Box */}
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-[2rem] p-6 flex flex-col items-center justify-between text-center relative overflow-hidden backdrop-blur-sm">
-            <div className="absolute top-0 right-0 p-4">
-              <div className={`w-2.5 h-2.5 rounded-full transition-all duration-700 ${monitor2Active ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-slate-700'}`} />
-            </div>
-
-            <div className="space-y-1 mt-2">
-              <h2 className="text-base font-black text-slate-100">کلید فرمان سخت‌افزاری</h2>
-              <p className="text-xs text-slate-400 leading-relaxed">با فشردن کلید زیر، فرمان روشن/خاموش به صفحه نمایش دوم صادر می‌شود.</p>
-            </div>
-
-            {/* Heavy-duty satisfying custom physical power switch */}
-            <div className="py-10">
-              <button 
-                onClick={toggleMonitor2}
-                className={`relative w-28 h-28 rounded-full flex items-center justify-center transition-all duration-500 cursor-pointer ${
-                  monitor2Active 
-                    ? 'bg-gradient-to-b from-red-600 to-red-800 shadow-[0_0_40px_rgba(239,68,68,0.45)] hover:shadow-[0_0_50px_rgba(239,68,68,0.65)] hover:scale-105 active:scale-95' 
-                    : 'bg-slate-900 border border-slate-800 shadow-inner hover:bg-slate-850 text-slate-400'
-                }`}
-                title="کلید کنترل خاموش / روشن مانیتور دوم"
-              >
-                <div className={`absolute inset-1 rounded-full border transition-colors duration-500 ${
-                  monitor2Active ? 'border-red-400/30' : 'border-slate-800/40'
-                }`} />
-
-                <div className="flex flex-col items-center gap-1.5">
-                  <Power className={`w-8 h-8 transition-colors duration-500 ${monitor2Active ? 'text-white' : 'text-slate-500'}`} />
-                  <span className={`text-[11px] font-black tracking-wider uppercase transition-colors duration-500 ${monitor2Active ? 'text-white' : 'text-slate-500'}`}>
-                    {monitor2Active ? 'روشن' : 'خاموش'}
-                  </span>
-                </div>
-              </button>
-            </div>
-
-            {/* Quick Status Bar */}
-            <div className="w-full bg-slate-950/60 rounded-2xl border border-slate-850 p-3 flex justify-between items-center text-xs">
-              <span className="text-slate-500 font-bold">وضعیت مانیتور دوم:</span>
-              <span className={`font-sans font-black ${monitor2Active ? 'text-red-400' : 'text-slate-500'}`}>
-                {monitor2Active ? 'SCREEN 2 ACTIVE' : 'SCREEN 2 POWER OFF'}
-              </span>
-            </div>
-          </div>
-
-          {/* Desktop Integration instructions Box */}
-          <div className="bg-slate-900/30 border border-slate-800/80 rounded-[2rem] p-6 flex flex-col gap-4 backdrop-blur-sm">
-            <div className="flex items-center gap-2 border-b border-slate-850 pb-3">
-              <Settings className="w-5 h-5 text-red-500" />
-              <div>
-                <h3 className="text-sm font-black text-slate-200">آموزش اتصال مانیتور فیزیکی</h3>
-                <p className="text-[10px] text-slate-500 mt-0.5">چگونه دکمه بالا و کیبورد را به ویندوز متصل کنید؟</p>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-400 leading-relaxed text-right" dir="auto">
-              مرورگرها به دلیل مسائل امنیتی اجازه اجرای فرمان‌های سیستمی مستقیم را ندارند. برای اینکه دکمه خاموش/روشن و کیبورد مجازی روی ویندوز واقعی شما کار کند، کافیست یکی از کدهای زیر را در کامپیوتر خود اجرا کنید:
-            </p>
-
-            {/* Tabs for scripts */}
-            <div className="space-y-3">
-              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-900 space-y-2">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-red-400">راه اول: کد پایتون (مستقل از پلتفرم)</span>
+                <div className="py-10">
                   <button 
-                    onClick={() => copyToClipboard(pythonScript, 'python')}
-                    className="text-[10px] bg-slate-900 text-slate-300 px-2 py-1 rounded border border-slate-800 hover:text-red-400 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
+                    onClick={toggleMonitor2}
+                    className={`relative w-28 h-28 rounded-full flex items-center justify-center transition-all duration-300 cursor-pointer ${
+                      monitor2Active 
+                        ? 'bg-gradient-to-b from-red-600 to-red-800 shadow-xl hover:scale-105 active:scale-95' 
+                        : 'bg-slate-900 border border-slate-800 hover:bg-slate-850 text-slate-400'
+                    }`}
                   >
-                    {copiedText === 'python' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedText === 'python' ? 'کپی شد' : 'کپی کد'}</span>
+                    <div className="flex flex-col items-center gap-1.5">
+                      <Power className={`w-8 h-8 ${monitor2Active ? 'text-white' : 'text-slate-500'}`} />
+                      <span className={`text-[11px] font-black tracking-wider uppercase ${monitor2Active ? 'text-white' : 'text-slate-500'}`}>
+                        {monitor2Active ? 'روشن' : 'خاموش'}
+                      </span>
+                    </div>
                   </button>
                 </div>
-                <div className="text-[10px] text-slate-400 leading-relaxed space-y-1">
-                  <p>۱. یک فایل به نام <code className="text-amber-500 font-mono">monitor_helper.py</code> بسازید و کد را داخل آن قرار دهید.</p>
-                  <p>۲. آن را با اجرای <code className="text-amber-500 font-mono">python monitor_helper.py</code> اجرا کنید.</p>
+
+                <div className="w-full bg-slate-950 rounded-2xl border border-slate-850 p-3 flex justify-between items-center text-xs">
+                  <span className="text-slate-500 font-bold">وضعیت مانیتور دوم:</span>
+                  <span className={`font-sans font-black ${monitor2Active ? 'text-red-400' : 'text-slate-500'}`}>
+                    {monitor2Active ? 'SCREEN 2 ACTIVE' : 'SCREEN 2 POWER OFF'}
+                  </span>
                 </div>
               </div>
 
-              <div className="bg-slate-950 p-3 rounded-2xl border border-slate-900 space-y-2">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-red-400">راه دوم: پاورشل ویندوز (بدون پیش‌نیاز)</span>
-                  <button 
-                    onClick={() => copyToClipboard(powerShellScript, 'powershell')}
-                    className="text-[10px] bg-slate-900 text-slate-300 px-2 py-1 rounded border border-slate-800 hover:text-red-400 active:scale-95 transition-all cursor-pointer flex items-center gap-1"
-                  >
-                    {copiedText === 'powershell' ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedText === 'powershell' ? 'کپی شد' : 'کپی کد'}</span>
-                  </button>
+              <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-6 flex flex-col gap-4">
+                <div className="flex items-center gap-2 border-b border-slate-850 pb-3">
+                  <Settings className="w-5 h-5 text-red-500" />
+                  <div>
+                    <h3 className="text-sm font-black text-slate-200">راهنمای استفاده اتصال مانیتور</h3>
+                  </div>
                 </div>
-                <div className="text-[10px] text-slate-400 leading-relaxed space-y-1">
-                  <p>۱. یک فایل متنی با پسوند <code className="text-amber-500 font-mono">monitor.ps1</code> ایجاد کنید و کد را در آن قرار دهید.</p>
-                  <p>۲. کلیک راست کرده و گزینه <code className="text-amber-500 font-bold">Run with PowerShell</code> را بزنید.</p>
-                </div>
+
+                <p className="text-xs text-slate-400 leading-relaxed text-right" dir="rtl">
+                  دستورات صادر شده از این مرکز کنترل، از طریق پورت محلی ۵۰۰۰ ارسال شده و مانیتور دوم را با متدهای سیستمی مدیریت می‌کند.
+                </p>
               </div>
+
             </div>
-
-            {/* Help Alerts */}
-            <div className="bg-red-950/20 border border-red-500/20 p-3.5 rounded-2xl flex items-start gap-2.5 text-[11px] text-red-300">
-              <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-              <div className="leading-relaxed text-right" dir="auto">
-                <span className="font-black">نحوه عملکرد سخت‌افزاری:</span> این اسکریپت‌ها با استفاده از دستور <code className="text-amber-400 font-bold font-mono">DisplaySwitch.exe</code> بین حالت تک نمایشگره و دو نمایشگره سوئیچ می‌کنند و کیبورد مجازی نیز دستورات تایپ را مستقیم منتقل می‌کند.
-              </div>
-            </div>
-
-          </div>
-
-        </div>
-        </>
+          </>
         )}
 
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-950 bg-slate-950/40 py-6 px-6 text-center text-xs text-slate-600 relative z-10 mt-auto">
+      <footer className="border-t border-slate-900 bg-slate-950 py-6 px-6 text-center text-xs text-slate-600 relative z-10 mt-auto">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4 font-mono">
           <span>DESIGNED EXCLUSIVELY FOR SOHEIL KESHTKAR</span>
           <span>© 2026 TRADING DESK POWER HUB</span>
